@@ -11,11 +11,15 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={
+            <>
+              <Dashboard />
+              <ChatAssistant />
+            </>
+          } />
           <Route path="/editor/:bookId" element={<BookEditor />} />
           <Route path="/preview/:bookId" element={<PDFPreview />} />
         </Routes>
-        <ChatAssistant />
       </BrowserRouter>
       <Toaster position="bottom-right" richColors />
     </div>

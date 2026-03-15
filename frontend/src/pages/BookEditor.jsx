@@ -66,6 +66,7 @@ import { toast } from 'sonner';
 import useBookStore from '../store/bookStore';
 import { bookApi, generateApi, getExerciseTypes } from '../services/api';
 import ExerciseRenderer from '../components/ExerciseRenderer';
+import ChatAssistant from '../components/ChatAssistant';
 
 const EXERCISE_ICONS = {
   sequence: ListOrdered,
@@ -357,6 +358,39 @@ export default function BookEditor() {
       toast.success('Immagine rimossa');
     } catch (error) {
       console.error('Error removing image:', error);
+    }
+  };
+
+  // Handle exercises from chat
+  const handleAddExercisesFromChat = async (exercises) => {
+    if (!currentBook || selectedChapterIndex === undefined || selectedChapterIndex < 0) {
+      // If no chapter selected, create one first
+      if (currentBook && (!currentBook.chapters || currentBook.chapters.length === 0)) {
+        toast.error('Crea prima un capitolo per aggiungere gli esercizi');
+        return;
+      }
+    }
+
+    const chapterIndex = selectedChapterIndex >= 0 ? selectedChapterIndex : 0;
+    
+    try {
+      // Add exercises to current chapter
+      addExercises(chapterIndex, exercises);
+      
+      // Save to backend
+      const updatedChapters = [...currentBook.chapters];
+      updatedChapters[chapterIndex].exercises = [
+        ...updatedChapters[chapterIndex].exercises,
+        ...exercises
+      ];
+      await bookApi.update(currentBook.id, { chapters: updatedChapters });
+      
+      // Select the first new exercise
+      selectExercise(updatedChapters[chapterIndex].exercises.length - exercises.length);
+      
+    } catch (error) {
+      console.error('Error adding exercises from chat:', error);
+      toast.error('Errore nell\'aggiunta degli esercizi');
     }
   };
 
@@ -902,6 +936,17 @@ export default function BookEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Chat Assistant with book context */}
+      <ChatAssistant 
+        bookContext={currentBook ? {
+          id: currentBook.id,
+          title: currentBook.title,
+          theme: currentBook.theme,
+          currentChapter: currentChapter?.title
+        } : null}
+        onAddExercises={currentChapter ? handleAddExercisesFromChat : null}
+      />
     </div>
   );
 }

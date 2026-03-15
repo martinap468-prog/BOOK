@@ -7,7 +7,9 @@ import {
   Sparkles,
   Plus,
   Bot,
-  User
+  User,
+  Check,
+  FileText
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,16 +19,18 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
+export default function ChatAssistant({ bookContext, onExercisesGenerated, onAddExercises }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Ciao! Sono il tuo assistente AI. Posso aiutarti a creare esercizi, suggerire contenuti e rispondere alle tue domande. Cosa vorresti fare?'
+      content: 'Ciao! Sono il tuo assistente AI. Posso aiutarti a creare esercizi, suggerire contenuti e rispondere alle tue domande. Cosa vorresti fare?',
+      exercises: null
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingExercises, setPendingExercises] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -47,34 +51,49 @@ export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage, exercises: null }]);
     setIsLoading(true);
+    setPendingExercises(null);
 
     try {
       const response = await axios.post(`${API_URL}/api/chat`, {
         message: userMessage,
-        history: messages.slice(-10),
+        history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
         book_context: bookContext
-      }, { timeout: 60000 });
+      }, { timeout: 90000 });
 
       const assistantMessage = response.data.response;
-      setMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
+      const exercises = response.data.exercises;
+      
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: assistantMessage,
+        exercises: exercises
+      }]);
 
-      // If exercises were generated, notify parent
-      if (response.data.exercises && response.data.exercises.length > 0) {
-        toast.success(`${response.data.exercises.length} esercizi generati!`);
-        if (onExercisesGenerated) {
-          onExercisesGenerated(response.data.exercises);
-        }
+      if (exercises && exercises.length > 0) {
+        setPendingExercises(exercises);
+        toast.success(`${exercises.length} esercizi generati! Clicca "Aggiungi al capitolo" per inserirli.`);
       }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'Mi dispiace, si è verificato un errore. Riprova tra poco.' 
+        content: 'Mi dispiace, si è verificato un errore. Riprova tra poco.',
+        exercises: null
       }]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddExercises = (exercises) => {
+    if (onAddExercises && exercises && exercises.length > 0) {
+      onAddExercises(exercises);
+      toast.success(`${exercises.length} esercizi aggiunti al capitolo!`);
+      setPendingExercises(null);
+    } else if (!onAddExercises) {
+      toast.error('Apri un libro per aggiungere gli esercizi');
     }
   };
 
@@ -86,14 +105,26 @@ export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
   };
 
   const quickActions = [
-    { label: 'Crea 5 esercizi di matematica', icon: Plus },
-    { label: 'Suggerisci esercizi per bambini', icon: Sparkles },
-    { label: 'Genera sequenze numeriche', icon: Plus },
+    { label: 'Crea 5 esercizi di matematica facili', icon: Plus },
+    { label: 'Genera sequenze numeriche per bambini', icon: Sparkles },
+    { label: 'Crea esercizi trova l\'intruso', icon: Plus },
   ];
 
   const handleQuickAction = (action) => {
     setInput(action);
     inputRef.current?.focus();
+  };
+
+  const getExerciseTypeName = (type) => {
+    const names = {
+      'math': 'Matematica',
+      'sequence': 'Sequenza',
+      'match': 'Collega',
+      'odd_one_out': 'Trova intruso',
+      'copy': 'Copia',
+      'memory': 'Memoria'
+    };
+    return names[type] || type;
   };
 
   if (!isOpen) {
@@ -110,7 +141,7 @@ export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
 
   return (
     <div 
-      className="fixed bottom-20 right-6 w-96 h-[500px] bg-white rounded-lg shadow-2xl border border-border flex flex-col z-50 overflow-hidden"
+      className="fixed bottom-20 right-6 w-[420px] h-[550px] bg-white rounded-lg shadow-2xl border border-border flex flex-col z-50 overflow-hidden"
       data-testid="chat-panel"
     >
       {/* Header */}
@@ -118,6 +149,11 @@ export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5 text-accent" />
           <span className="font-medium text-primary">Assistente AI</span>
+          {bookContext && (
+            <span className="text-xs bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">
+              {bookContext.title?.substring(0, 15)}...
+            </span>
+          )}
         </div>
         <Button 
           variant="ghost" 
@@ -133,38 +169,83 @@ export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.map((msg, i) => (
-            <div 
-              key={i}
-              className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-accent" />
-                </div>
-              )}
+            <div key={i} className="space-y-2">
               <div 
-                className={`max-w-[80%] p-3 rounded-lg text-sm ${
-                  msg.role === 'user' 
-                    ? 'bg-accent text-white rounded-br-none' 
-                    : 'bg-secondary text-foreground rounded-bl-none'
-                }`}
+                className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                {msg.role === 'assistant' && (
+                  <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-accent" />
+                  </div>
+                )}
+                <div 
+                  className={`max-w-[85%] p-3 rounded-lg text-sm ${
+                    msg.role === 'user' 
+                      ? 'bg-accent text-white rounded-br-none' 
+                      : 'bg-secondary text-foreground rounded-bl-none'
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                </div>
+                {msg.role === 'user' && (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-primary" />
+                  </div>
+                )}
               </div>
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-primary" />
+              
+              {/* Show generated exercises */}
+              {msg.exercises && msg.exercises.length > 0 && (
+                <div className="ml-10 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Check className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">
+                      {msg.exercises.length} esercizi generati
+                    </span>
+                  </div>
+                  <div className="space-y-1 mb-3">
+                    {msg.exercises.slice(0, 3).map((ex, j) => (
+                      <div key={j} className="text-xs text-green-700 flex items-center gap-1">
+                        <FileText className="w-3 h-3" />
+                        {ex.title || getExerciseTypeName(ex.type)}
+                      </div>
+                    ))}
+                    {msg.exercises.length > 3 && (
+                      <div className="text-xs text-green-600">
+                        + altri {msg.exercises.length - 3} esercizi
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddExercises(msg.exercises)}
+                    className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+                    disabled={!onAddExercises}
+                    data-testid="add-exercises-btn"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Aggiungi al Capitolo
+                  </Button>
+                  {!onAddExercises && (
+                    <p className="text-xs text-amber-600 mt-2 text-center">
+                      Apri un libro per aggiungere gli esercizi
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           ))}
+          
           {isLoading && (
             <div className="flex gap-2">
               <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
                 <Bot className="w-4 h-4 text-accent" />
               </div>
               <div className="bg-secondary p-3 rounded-lg rounded-bl-none">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Sto pensando...</span>
+                </div>
               </div>
             </div>
           )}
@@ -199,7 +280,7 @@ export default function ChatAssistant({ bookContext, onExercisesGenerated }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Scrivi un messaggio..."
+            placeholder="Es: Crea 5 esercizi di matematica..."
             disabled={isLoading}
             className="flex-1"
             data-testid="chat-input"
