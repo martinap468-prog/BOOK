@@ -45,6 +45,12 @@ Software per generare quaderni di esercizi cognitivi per persone con Alzheimer. 
 - ✅ **Riconoscimento** - Identifica oggetti
 - ✅ **Memoria** - Trova le coppie
 
+### Esercizi con Immagini AI (NUOVI)
+- ✅ **Labirinto** 🎨 - Percorsi generati con AI
+- ✅ **Trova le Differenze** 🎨 - Due immagini simili con differenze
+- ✅ **Colora** 🎨 - Disegni da colorare generati con AI
+- ✅ **Unisci i Puntini** 🎨 - Connect-the-dots generati con AI
+
 ### PDF Preview & Export
 - ✅ Anteprima navigabile
 - ✅ Export PDF formato Amazon KDP
@@ -57,7 +63,7 @@ Software per generare quaderni di esercizi cognitivi per persone con Alzheimer. 
 - ✅ Export PDF
 
 ### P1 (High Priority)
-- [ ] Generazione immagini AI per esercizi grafici (labirinti, colorare, trova differenze)
+- ✅ Generazione immagini AI per esercizi grafici (labirinti, colorare, trova differenze, unisci puntini)
 - [ ] Pagina soluzioni alla fine del quaderno
 - [ ] Template predefiniti per livelli diversi
 
