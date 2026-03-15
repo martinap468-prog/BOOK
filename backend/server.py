@@ -98,6 +98,15 @@ class GenerateChapterRequest(BaseModel):
     exercise_count: int = 5
     color_mode: str = "bw"
 
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[ChatMessage] = []
+    book_context: Optional[Dict[str, Any]] = None  # Current book info for context
+
 # Exercise type definitions
 EXERCISE_TYPES = {
     "sequence": {
@@ -855,6 +864,150 @@ async def generate_cover(title: str = "Quaderno di Esercizi", style: str = "simp
             
     except Exception as e:
         logging.error(f"Generate cover error: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
+
+# Include the router
+@api_router.post("/chat")
+async def chat_with_assistant(request: ChatRequest):
+    """Chat with AI assistant for book creation help"""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API key non configurata")
+        
+        # Build system message with context
+        system_message = """Sei un assistente esperto nella creazione di libri ed esercizi educativi. 
+Puoi aiutare a:
+- Creare esercizi personalizzati (matematica, sequenze, memoria, ecc.)
+- Suggerire contenuti in base al tema e all'età target
+- Generare idee per capitoli e struttura del libro
+- Scrivere istruzioni chiare per gli esercizi
+- Dare consigli su difficoltà e formato
+
+Rispondi sempre in italiano in modo chiaro e utile.
+
+Quando l'utente chiede di creare esercizi, genera il contenuto in formato strutturato.
+Per esempio, se chiede "crea 3 esercizi di matematica facili", rispondi con gli esercizi formattati.
+
+IMPORTANTE: Quando generi esercizi, usa questo formato JSON alla fine della risposta:
+```json
+{"exercises": [{"type": "math", "title": "Calcola", "instruction": "...", "content": {...}}]}
+```
+"""
+        
+        # Add book context if available
+        if request.book_context:
+            theme = request.book_context.get('theme', 'custom')
+            title = request.book_context.get('title', '')
+            system_message += f"\n\nContesto attuale: Stai lavorando su un libro '{title}' con tema '{theme}'."
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"chat-{uuid.uuid4()}",
+            system_message=system_message
+        ).with_model("openai", "gpt-5.2")
+        
+        # Add history
+        for msg in request.history[-10:]:  # Keep last 10 messages for context
+            if msg.role == "user":
+                await chat.send_message(UserMessage(text=msg.content))
+        
+        # Send current message
+        message = UserMessage(text=request.message)
+        response = await chat.send_message(message)
+        
+        # Try to extract exercises if present in response
+        exercises = None
+        if "```json" in response:
+            try:
+                import re
+                json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+                if json_match:
+                    import json
+                    data = json.loads(json_match.group(1))
+                    if "exercises" in data:
+                        exercises = data["exercises"]
+            except:
+                pass
+        
+        return {
+            "response": response,
+            "exercises": exercises
+        }
+        
+    except Exception as e:
+        logging.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nella chat: {str(e)}")
+
+@api_router.post("/chat/generate-exercises")
+async def chat_generate_exercises(request: ChatRequest):
+    """Generate exercises based on chat request"""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API key non configurata")
+        
+        system_message = """Sei un generatore di esercizi educativi. 
+Genera esercizi in formato JSON valido.
+
+Tipi di esercizi disponibili:
+- sequence: Completa la sequenza (numeri)
+- math: Calcoli matematici
+- match: Collega parole e definizioni
+- odd_one_out: Trova l'intruso
+- copy: Copia e scrivi
+- memory: Esercizi di memoria
+
+RISPONDI SOLO con JSON valido nel formato:
+{
+  "exercises": [
+    {
+      "type": "math",
+      "title": "Calcola",
+      "instruction": "Quanto fa 5 + 3?",
+      "difficulty": "easy",
+      "content": {"operand1": 5, "operand2": 3, "operator": "+", "answer": 8}
+    }
+  ]
+}
+"""
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"gen-{uuid.uuid4()}",
+            system_message=system_message
+        ).with_model("openai", "gpt-5.2")
+        
+        message = UserMessage(text=request.message)
+        response = await chat.send_message(message)
+        
+        # Parse JSON response
+        import json
+        clean_response = response.strip()
+        if clean_response.startswith("```"):
+            clean_response = clean_response.split("\n", 1)[1]
+        if clean_response.endswith("```"):
+            clean_response = clean_response.rsplit("```", 1)[0]
+        clean_response = clean_response.strip()
+        
+        try:
+            data = json.loads(clean_response)
+            exercises = data.get("exercises", [])
+            
+            # Add IDs to exercises
+            for ex in exercises:
+                ex["id"] = str(uuid.uuid4())
+            
+            return {"exercises": exercises}
+        except json.JSONDecodeError:
+            return {"exercises": [], "raw_response": response}
+        
+    except Exception as e:
+        logging.error(f"Generate exercises error: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
 
 # Include the router

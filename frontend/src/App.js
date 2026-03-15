@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import Dashboard from "./pages/Dashboard";
 import BookEditor from "./pages/BookEditor";
 import PDFPreview from "./pages/PDFPreview";
+import ChatAssistant from "./components/ChatAssistant";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/editor/:bookId" element={<BookEditor />} />
           <Route path="/preview/:bookId" element={<PDFPreview />} />
         </Routes>
+        <ChatAssistant />
       </BrowserRouter>
       <Toaster position="bottom-right" richColors />
     </div>
