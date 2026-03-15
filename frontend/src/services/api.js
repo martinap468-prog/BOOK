@@ -37,6 +37,12 @@ export const getExerciseTypes = async () => {
   return response.data;
 };
 
+// Book Themes
+export const getThemes = async () => {
+  const response = await axios.get(`${API}/themes`);
+  return response.data;
+};
+
 // Generation API
 export const generateApi = {
   exercise: async (exerciseType, difficulty = 'medium', quantity = 1, colorMode = 'bw', topic = null) => {
@@ -84,4 +90,4 @@ export const generateApi = {
   }
 };
 
-export default { bookApi, generateApi, getExerciseTypes };
+export default { bookApi, generateApi, getExerciseTypes, getThemes };

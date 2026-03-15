@@ -54,14 +54,15 @@ class BookSettings(BaseModel):
     exercises_per_page: int = 1
     difficulty: str = "medium"
     include_solutions: bool = True
+    theme: str = "custom"  # Theme preset
 
 class Book(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    title: str = "Nuovo Quaderno di Esercizi"
+    title: str = "Nuovo Libro"
     subtitle: str = ""
     author: str = ""
-    target_audience: str = "alzheimer"
+    theme: str = "custom"  # Theme/category
     cover_image: Optional[str] = None
     chapters: List[Chapter] = []
     settings: BookSettings = Field(default_factory=BookSettings)
@@ -69,9 +70,10 @@ class Book(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class BookCreate(BaseModel):
-    title: str = "Nuovo Quaderno di Esercizi"
+    title: str = "Nuovo Libro"
     subtitle: str = ""
     author: str = ""
+    theme: str = "custom"
     settings: Optional[BookSettings] = None
 
 class BookUpdate(BaseModel):
@@ -166,11 +168,111 @@ EXERCISE_TYPES = {
     }
 }
 
+# Book themes/templates
+BOOK_THEMES = {
+    "alzheimer": {
+        "name": "Stimolazione Cognitiva",
+        "description": "Esercizi per persone con Alzheimer o demenza",
+        "icon": "brain",
+        "default_settings": {
+            "font_size": 20,
+            "color_mode": "bw",
+            "difficulty": "easy",
+            "format": "8.5x11"
+        },
+        "recommended_exercises": ["sequence", "math", "match", "odd_one_out", "copy", "memory", "coloring"],
+        "style": "simple, clear, large text, high contrast"
+    },
+    "kids_preschool": {
+        "name": "Bambini Prescolare (3-5 anni)",
+        "description": "Attività divertenti per i più piccoli",
+        "icon": "baby",
+        "default_settings": {
+            "font_size": 24,
+            "color_mode": "color",
+            "difficulty": "easy",
+            "format": "8.5x11"
+        },
+        "recommended_exercises": ["coloring", "maze", "connect_dots", "match", "differences"],
+        "style": "colorful, fun, cartoon-style, very simple"
+    },
+    "kids_elementary": {
+        "name": "Bambini Elementari (6-10 anni)",
+        "description": "Esercizi educativi per la scuola primaria",
+        "icon": "school",
+        "default_settings": {
+            "font_size": 16,
+            "color_mode": "bw",
+            "difficulty": "medium",
+            "format": "8.5x11"
+        },
+        "recommended_exercises": ["math", "sequence", "copy", "odd_one_out", "maze", "differences"],
+        "style": "educational, clear, age-appropriate illustrations"
+    },
+    "language_learning": {
+        "name": "Apprendimento Lingue",
+        "description": "Esercizi per imparare nuove lingue",
+        "icon": "languages",
+        "default_settings": {
+            "font_size": 16,
+            "color_mode": "bw",
+            "difficulty": "medium",
+            "format": "6x9"
+        },
+        "recommended_exercises": ["match", "copy", "recognition", "odd_one_out"],
+        "style": "clean, educational, vocabulary-focused"
+    },
+    "puzzle_games": {
+        "name": "Puzzle e Giochi",
+        "description": "Rompicapo e giochi di logica",
+        "icon": "puzzle",
+        "default_settings": {
+            "font_size": 14,
+            "color_mode": "bw",
+            "difficulty": "medium",
+            "format": "6x9"
+        },
+        "recommended_exercises": ["maze", "differences", "sequence", "memory", "connect_dots"],
+        "style": "puzzle-style, challenging, brain-teaser"
+    },
+    "activity_book": {
+        "name": "Activity Book",
+        "description": "Libro di attività miste",
+        "icon": "sparkles",
+        "default_settings": {
+            "font_size": 16,
+            "color_mode": "color",
+            "difficulty": "medium",
+            "format": "8.5x11"
+        },
+        "recommended_exercises": ["coloring", "maze", "connect_dots", "differences", "match", "copy"],
+        "style": "varied, fun, engaging activities"
+    },
+    "custom": {
+        "name": "Personalizzato",
+        "description": "Crea il tuo libro con impostazioni personalizzate",
+        "icon": "settings",
+        "default_settings": {
+            "font_size": 16,
+            "color_mode": "bw",
+            "difficulty": "medium",
+            "format": "6x9"
+        },
+        "recommended_exercises": ["sequence", "math", "match", "maze", "coloring", "copy", "memory", "differences", "connect_dots", "odd_one_out", "recognition"],
+        "style": "user-defined"
+    }
+}
+
 # ============== BOOK ENDPOINTS ==============
 
 @api_router.get("/")
 async def root():
-    return {"message": "Quaderni Cognitivi API - Esercizi per Alzheimer"}
+    return {"message": "Book Creator API - Crea libri ed esercizi personalizzati"}
+
+@api_router.get("/themes")
+async def get_themes():
+    """Get available book themes/templates"""
+    return BOOK_THEMES
 
 @api_router.get("/exercise-types")
 async def get_exercise_types():
