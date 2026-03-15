@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -22,7 +22,10 @@ import {
   Palette,
   CircleOff,
   Search,
-  GitBranch
+  GitBranch,
+  Image as ImageIcon,
+  Upload,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -104,9 +107,13 @@ export default function BookEditor() {
   const [showAddChapterDialog, setShowAddChapterDialog] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showDeleteChapterDialog, setShowDeleteChapterDialog] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
   const [chapterToDelete, setChapterToDelete] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState({});
+  const [imagePrompt, setImagePrompt] = useState('');
+  const fileInputRef = useRef(null);
 
   const [newChapter, setNewChapter] = useState({
     title: '',
@@ -263,6 +270,94 @@ export default function BookEditor() {
   const handleDeleteExercise = (exerciseIndex) => {
     removeExercise(selectedChapterIndex, exerciseIndex);
     toast.success('Esercizio eliminato');
+  };
+
+  // Image handling functions
+  const handleUploadImage = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seleziona un file immagine valido');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1];
+      await addImageToExercise(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleGenerateImage = async () => {
+    if (!imagePrompt.trim()) {
+      toast.error('Inserisci una descrizione per l\'immagine');
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    toast.info('Generazione immagine in corso (30-60 secondi)...');
+    
+    try {
+      const response = await generateApi.customImage(
+        imagePrompt,
+        currentBook?.settings?.color_mode || 'bw'
+      );
+      
+      if (response.image_base64) {
+        await addImageToExercise(response.image_base64);
+        setImagePrompt('');
+        setShowImageDialog(false);
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast.error('Errore nella generazione dell\'immagine');
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const addImageToExercise = async (imageBase64) => {
+    if (!currentBook || selectedChapterIndex === undefined || selectedExerciseIndex === undefined) return;
+
+    const chapters = [...currentBook.chapters];
+    const exercise = chapters[selectedChapterIndex].exercises[selectedExerciseIndex];
+    
+    // Add image to exercise's images array
+    const images = exercise.images || [];
+    images.push(imageBase64);
+    exercise.images = images;
+    
+    // Update local state
+    setCurrentBook({ ...currentBook, chapters });
+    
+    // Save to backend
+    try {
+      await bookApi.update(currentBook.id, { chapters });
+      toast.success('Immagine aggiunta!');
+    } catch (error) {
+      console.error('Error saving image:', error);
+      toast.error('Errore nel salvataggio');
+    }
+  };
+
+  const removeImageFromExercise = async (imageIndex) => {
+    if (!currentBook || selectedChapterIndex === undefined || selectedExerciseIndex === undefined) return;
+
+    const chapters = [...currentBook.chapters];
+    const exercise = chapters[selectedChapterIndex].exercises[selectedExerciseIndex];
+    
+    exercise.images = exercise.images.filter((_, i) => i !== imageIndex);
+    
+    setCurrentBook({ ...currentBook, chapters });
+    
+    try {
+      await bookApi.update(currentBook.id, { chapters });
+      toast.success('Immagine rimossa');
+    } catch (error) {
+      console.error('Error removing image:', error);
+    }
   };
 
   const toggleChapter = (index) => {
@@ -468,14 +563,76 @@ export default function BookEditor() {
 
         {/* Exercise Display */}
         {currentExercise ? (
-          <div 
-            className="w-full max-w-4xl bg-white border border-border rounded-lg shadow-sm p-8 md:p-12"
-            style={{ fontSize: `${currentBook.settings?.font_size || 18}pt` }}
-          >
-            <ExerciseRenderer 
-              exercise={currentExercise} 
-              colorMode={currentBook.settings?.color_mode || 'bw'}
-            />
+          <div className="w-full max-w-4xl">
+            {/* Image Controls */}
+            <div className="flex items-center justify-end gap-2 mb-4">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleUploadImage}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-2"
+                data-testid="upload-image-btn"
+              >
+                <Upload className="w-4 h-4" />
+                Carica Immagine
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowImageDialog(true)}
+                className="gap-2"
+                data-testid="generate-image-btn"
+              >
+                <Sparkles className="w-4 h-4" />
+                Genera Immagine AI
+              </Button>
+            </div>
+
+            {/* Exercise Content */}
+            <div 
+              className="bg-white border border-border rounded-lg shadow-sm p-8 md:p-12"
+              style={{ fontSize: `${currentBook.settings?.font_size || 18}pt` }}
+            >
+              <ExerciseRenderer 
+                exercise={currentExercise} 
+                colorMode={currentBook.settings?.color_mode || 'bw'}
+              />
+              
+              {/* User Added Images */}
+              {currentExercise.images && currentExercise.images.length > 0 && (
+                <div className="mt-8 pt-8 border-t border-border">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">
+                    Immagini Aggiunte
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {currentExercise.images.map((img, i) => (
+                      <div key={i} className="relative group">
+                        <img
+                          src={`data:image/png;base64,${img}`}
+                          alt={`Immagine ${i + 1}`}
+                          className="w-full h-48 object-contain rounded-lg border border-border bg-secondary/20"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeImageFromExercise(i)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : currentChapter ? (
           <div className="w-full max-w-4xl bg-white/50 border border-dashed border-border rounded-lg p-12 text-center">
@@ -687,6 +844,64 @@ export default function BookEditor() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Generate Image Dialog */}
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="generate-image-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5" />
+              Genera Immagine con AI
+            </DialogTitle>
+            <DialogDescription>
+              Descrivi l'immagine che vuoi generare. Sarà creata in stile semplice e chiaro.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="imagePrompt">Descrizione Immagine</Label>
+              <Input
+                id="imagePrompt"
+                placeholder="Es: un gatto, una casa, frutta sul tavolo, un albero..."
+                value={imagePrompt}
+                onChange={(e) => setImagePrompt(e.target.value)}
+                data-testid="image-prompt-input"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              L'immagine sarà generata in stile {currentBook?.settings?.color_mode === 'color' ? 'a colori semplici' : 'bianco e nero'}, adatto per la stampa.
+            </p>
+            <p className="text-xs text-amber-600">
+              ⚠️ La generazione richiede 30-60 secondi
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImageDialog(false)}>
+              Annulla
+            </Button>
+            <Button 
+              onClick={handleGenerateImage}
+              disabled={isGeneratingImage || !imagePrompt.trim()}
+              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+              data-testid="confirm-generate-image-btn"
+            >
+              {isGeneratingImage ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generazione...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Genera Immagine
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

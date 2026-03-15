@@ -653,14 +653,17 @@ async def generate_exercise_image(request: GenerateExerciseRequest):
         if request.color_mode == "color":
             style = "simple colorful illustration, clear shapes, high contrast, suitable for elderly people, large and clear"
         
-        prompts = {
-            "differences": f"Two similar simple drawings side by side with 3-5 subtle differences, {style}",
-            "maze": f"Simple maze puzzle with clear path, not too complex, {style}",
-            "coloring": f"Simple outline drawing of a {request.topic or 'flower'} for coloring, {style}",
-            "recognition": f"Clear simple drawings of common household objects arranged in a grid, {style}",
-        }
-        
-        prompt = prompts.get(request.exercise_type, f"Simple illustration for cognitive exercise, {style}")
+        # If topic is provided, use it as the main prompt
+        if request.topic:
+            prompt = f"{request.topic}, {style}"
+        else:
+            prompts = {
+                "differences": f"Two similar simple drawings side by side with 3-5 subtle differences, {style}",
+                "maze": f"Simple maze puzzle with clear path, not too complex, {style}",
+                "coloring": f"Simple outline drawing of a flower for coloring, {style}",
+                "recognition": f"Clear simple drawings of common household objects arranged in a grid, {style}",
+            }
+            prompt = prompts.get(request.exercise_type, f"Simple illustration for cognitive exercise, {style}")
         
         images = await image_gen.generate_images(
             prompt=prompt,
@@ -676,6 +679,45 @@ async def generate_exercise_image(request: GenerateExerciseRequest):
             
     except Exception as e:
         logging.error(f"Generate image error: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
+
+class CustomImageRequest(BaseModel):
+    prompt: str
+    color_mode: str = "bw"
+
+@api_router.post("/generate/custom-image")
+async def generate_custom_image(request: CustomImageRequest):
+    """Generate a custom image based on user prompt"""
+    try:
+        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API key non configurata")
+        
+        image_gen = OpenAIImageGeneration(api_key=api_key)
+        
+        # Build style based on color mode
+        style = "simple line drawing, black and white, clear outlines, suitable for elderly people, large and clear, printable"
+        if request.color_mode == "color":
+            style = "simple colorful illustration, clear shapes, high contrast, suitable for elderly people, large and clear"
+        
+        prompt = f"{request.prompt}, {style}"
+        
+        images = await image_gen.generate_images(
+            prompt=prompt,
+            model="gpt-image-1",
+            number_of_images=1
+        )
+        
+        if images and len(images) > 0:
+            image_base64 = base64.b64encode(images[0]).decode('utf-8')
+            return {"image_base64": image_base64}
+        else:
+            raise HTTPException(status_code=500, detail="Nessuna immagine generata")
+            
+    except Exception as e:
+        logging.error(f"Generate custom image error: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
 
 @api_router.post("/generate/cover")

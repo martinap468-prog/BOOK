@@ -66,7 +66,15 @@ export const generateApi = {
       exercise_type: exerciseType,
       color_mode: colorMode,
       topic
-    });
+    }, { timeout: 120000 }); // 2 minute timeout for image generation
+    return response.data;
+  },
+
+  customImage: async (prompt, colorMode = 'bw') => {
+    const response = await axios.post(`${API}/generate/custom-image`, {
+      prompt,
+      color_mode: colorMode
+    }, { timeout: 120000 });
     return response.data;
   },
 
