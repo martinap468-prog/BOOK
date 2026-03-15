@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Dashboard from "./pages/Dashboard";
 import BookEditor from "./pages/BookEditor";
-import CoverDesigner from "./pages/CoverDesigner";
 import PDFPreview from "./pages/PDFPreview";
 
 function App() {
@@ -13,7 +12,6 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/editor/:bookId" element={<BookEditor />} />
-          <Route path="/cover/:bookId" element={<CoverDesigner />} />
           <Route path="/preview/:bookId" element={<PDFPreview />} />
         </Routes>
       </BrowserRouter>

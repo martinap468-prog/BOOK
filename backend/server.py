@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 import base64
+import random
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -20,105 +21,152 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
 app = FastAPI()
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
 # ============== MODELS ==============
 
-class ChapterContent(BaseModel):
+class Exercise(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: str  # "differences", "sequence", "match", "maze", "math", "recognition", "memory", "copy", "coloring"
+    title: str = ""
+    instruction: str = ""
+    difficulty: str = "medium"  # "easy", "medium", "hard"
+    content: Dict[str, Any] = {}  # Exercise-specific data
+    image_base64: Optional[str] = None
+    solution: Optional[Dict[str, Any]] = None
+
+class Chapter(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str = ""
-    content: str = ""
+    description: str = ""
+    exercise_type: str = "mixed"
+    exercises: List[Exercise] = []
     order: int = 0
-    images: List[str] = []
 
 class BookSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    page_count: int = 50
-    chapter_count: int = 5
-    color_mode: str = "color"  # "color" or "bw"
-    format: str = "6x9"  # "5x8", "6x9", "8.5x11"
-    font_family: str = "Crimson Pro"
-    font_size: int = 12
-    line_height: float = 1.6
+    format: str = "8.5x11"  # Large format for readability
+    color_mode: str = "bw"  # "bw" or "color"
+    font_size: int = 18  # Large font
+    exercises_per_page: int = 1
+    difficulty: str = "medium"
+    include_solutions: bool = True
 
 class Book(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    title: str = "Nuovo Libro"
+    title: str = "Nuovo Quaderno di Esercizi"
+    subtitle: str = ""
     author: str = ""
-    topic: str = ""
-    description: str = ""
+    target_audience: str = "alzheimer"
     cover_image: Optional[str] = None
-    chapters: List[ChapterContent] = []
+    chapters: List[Chapter] = []
     settings: BookSettings = Field(default_factory=BookSettings)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class BookCreate(BaseModel):
-    title: str = "Nuovo Libro"
+    title: str = "Nuovo Quaderno di Esercizi"
+    subtitle: str = ""
     author: str = ""
-    topic: str = ""
-    description: str = ""
     settings: Optional[BookSettings] = None
 
 class BookUpdate(BaseModel):
     title: Optional[str] = None
+    subtitle: Optional[str] = None
     author: Optional[str] = None
-    topic: Optional[str] = None
-    description: Optional[str] = None
     cover_image: Optional[str] = None
-    chapters: Optional[List[ChapterContent]] = None
+    chapters: Optional[List[Chapter]] = None
     settings: Optional[BookSettings] = None
 
-class ChapterUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    order: Optional[int] = None
-    images: Optional[List[str]] = None
+class GenerateExerciseRequest(BaseModel):
+    exercise_type: str
+    difficulty: str = "medium"
+    topic: Optional[str] = None
+    quantity: int = 1
+    color_mode: str = "bw"
 
-class GenerateContentRequest(BaseModel):
-    topic: str
+class GenerateChapterRequest(BaseModel):
     chapter_title: str
-    word_count: int = 500
-    style: str = "informativo"
-    language: str = "italiano"
+    exercise_type: str
+    difficulty: str = "medium"
+    exercise_count: int = 5
+    color_mode: str = "bw"
 
-class GenerateOutlineRequest(BaseModel):
-    topic: str
-    chapter_count: int = 5
-    style: str = "informativo"
-    language: str = "italiano"
-
-class GenerateImageRequest(BaseModel):
-    prompt: str
-    style: str = "realistic"
-    size: str = "1024x1024"
-
-class GenerateCoverRequest(BaseModel):
-    title: str
-    author: str
-    topic: str
-    style: str = "modern"
+# Exercise type definitions
+EXERCISE_TYPES = {
+    "differences": {
+        "name": "Trova le Differenze",
+        "description": "Trova le differenze tra due immagini simili",
+        "icon": "search"
+    },
+    "sequence": {
+        "name": "Completa la Sequenza",
+        "description": "Completa la sequenza di numeri, lettere o figure",
+        "icon": "list-ordered"
+    },
+    "match": {
+        "name": "Collega",
+        "description": "Collega parole e immagini corrispondenti",
+        "icon": "link"
+    },
+    "maze": {
+        "name": "Labirinto",
+        "description": "Trova la strada nel labirinto",
+        "icon": "route"
+    },
+    "math": {
+        "name": "Calcoli",
+        "description": "Operazioni matematiche semplici",
+        "icon": "calculator"
+    },
+    "recognition": {
+        "name": "Riconoscimento",
+        "description": "Riconosci e nomina gli oggetti",
+        "icon": "eye"
+    },
+    "memory": {
+        "name": "Memoria",
+        "description": "Esercizi di memoria visiva",
+        "icon": "brain"
+    },
+    "copy": {
+        "name": "Copia e Scrivi",
+        "description": "Ricalca o copia parole e frasi",
+        "icon": "pencil"
+    },
+    "coloring": {
+        "name": "Colora",
+        "description": "Colora le figure",
+        "icon": "palette"
+    },
+    "odd_one_out": {
+        "name": "Trova l'Intruso",
+        "description": "Trova l'elemento diverso dagli altri",
+        "icon": "circle-off"
+    }
+}
 
 # ============== BOOK ENDPOINTS ==============
 
 @api_router.get("/")
 async def root():
-    return {"message": "BookCreator AI API"}
+    return {"message": "Quaderni Cognitivi API - Esercizi per Alzheimer"}
+
+@api_router.get("/exercise-types")
+async def get_exercise_types():
+    return EXERCISE_TYPES
 
 @api_router.post("/books", response_model=Book)
 async def create_book(book_data: BookCreate):
     settings = book_data.settings or BookSettings()
     book = Book(
         title=book_data.title,
+        subtitle=book_data.subtitle,
         author=book_data.author,
-        topic=book_data.topic,
-        description=book_data.description,
         settings=settings,
         chapters=[]
     )
@@ -143,12 +191,10 @@ async def update_book(book_id: str, update_data: BookUpdate):
     update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
     if update_dict:
         update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-        # Handle nested settings
         if "settings" in update_dict and update_dict["settings"]:
-            update_dict["settings"] = update_dict["settings"].model_dump() if hasattr(update_dict["settings"], 'model_dump') else update_dict["settings"]
-        # Handle chapters
+            update_dict["settings"] = update_dict["settings"] if isinstance(update_dict["settings"], dict) else update_dict["settings"].model_dump()
         if "chapters" in update_dict and update_dict["chapters"]:
-            update_dict["chapters"] = [c.model_dump() if hasattr(c, 'model_dump') else c for c in update_dict["chapters"]]
+            update_dict["chapters"] = [c if isinstance(c, dict) else c.model_dump() for c in update_dict["chapters"]]
         await db.books.update_one({"id": book_id}, {"$set": update_dict})
     book = await db.books.find_one({"id": book_id}, {"_id": 0})
     if not book:
@@ -162,165 +208,289 @@ async def delete_book(book_id: str):
         raise HTTPException(status_code=404, detail="Libro non trovato")
     return {"message": "Libro eliminato"}
 
-# ============== CHAPTER ENDPOINTS ==============
+# ============== EXERCISE GENERATION ==============
 
-@api_router.post("/books/{book_id}/chapters", response_model=ChapterContent)
-async def add_chapter(book_id: str, chapter: ChapterContent):
-    book = await db.books.find_one({"id": book_id}, {"_id": 0})
-    if not book:
-        raise HTTPException(status_code=404, detail="Libro non trovato")
+def generate_sequence_exercise(difficulty: str) -> Dict:
+    """Generate a sequence completion exercise"""
+    if difficulty == "easy":
+        # Simple number sequences
+        start = random.randint(1, 5)
+        step = 1
+        sequence = [start + i * step for i in range(5)]
+        hidden_idx = random.randint(2, 4)
+    elif difficulty == "medium":
+        start = random.randint(1, 10)
+        step = random.choice([2, 5, 10])
+        sequence = [start + i * step for i in range(5)]
+        hidden_idx = random.randint(1, 3)
+    else:
+        start = random.randint(1, 20)
+        step = random.choice([3, 4, 7])
+        sequence = [start + i * step for i in range(6)]
+        hidden_idx = random.randint(1, 4)
     
-    chapter_dict = chapter.model_dump()
-    await db.books.update_one(
-        {"id": book_id},
-        {
-            "$push": {"chapters": chapter_dict},
-            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
-        }
-    )
-    return chapter
-
-@api_router.put("/books/{book_id}/chapters/{chapter_id}", response_model=ChapterContent)
-async def update_chapter(book_id: str, chapter_id: str, update_data: ChapterUpdate):
-    book = await db.books.find_one({"id": book_id}, {"_id": 0})
-    if not book:
-        raise HTTPException(status_code=404, detail="Libro non trovato")
+    answer = sequence[hidden_idx]
+    sequence[hidden_idx] = "?"
     
-    chapters = book.get("chapters", [])
-    chapter_index = None
-    for i, ch in enumerate(chapters):
-        if ch["id"] == chapter_id:
-            chapter_index = i
-            break
+    return {
+        "sequence": sequence,
+        "answer": answer,
+        "type": "numbers"
+    }
+
+def generate_math_exercise(difficulty: str) -> Dict:
+    """Generate a simple math exercise"""
+    if difficulty == "easy":
+        a = random.randint(1, 10)
+        b = random.randint(1, 10)
+        op = "+"
+        result = a + b
+    elif difficulty == "medium":
+        op = random.choice(["+", "-"])
+        if op == "+":
+            a = random.randint(5, 20)
+            b = random.randint(1, 15)
+            result = a + b
+        else:
+            a = random.randint(10, 30)
+            b = random.randint(1, a)
+            result = a - b
+    else:
+        op = random.choice(["+", "-", "×"])
+        if op == "+":
+            a = random.randint(10, 50)
+            b = random.randint(10, 50)
+            result = a + b
+        elif op == "-":
+            a = random.randint(20, 100)
+            b = random.randint(1, a)
+            result = a - b
+        else:
+            a = random.randint(2, 10)
+            b = random.randint(2, 10)
+            result = a * b
     
-    if chapter_index is None:
-        raise HTTPException(status_code=404, detail="Capitolo non trovato")
-    
-    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
-    for key, value in update_dict.items():
-        chapters[chapter_index][key] = value
-    
-    await db.books.update_one(
-        {"id": book_id},
-        {
-            "$set": {
-                "chapters": chapters,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }
-        }
-    )
-    return ChapterContent(**chapters[chapter_index])
+    return {
+        "operand1": a,
+        "operand2": b,
+        "operator": op,
+        "answer": result
+    }
 
-@api_router.delete("/books/{book_id}/chapters/{chapter_id}")
-async def delete_chapter(book_id: str, chapter_id: str):
-    result = await db.books.update_one(
-        {"id": book_id},
-        {
-            "$pull": {"chapters": {"id": chapter_id}},
-            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
-        }
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Capitolo non trovato")
-    return {"message": "Capitolo eliminato"}
-
-# ============== AI GENERATION ENDPOINTS ==============
-
-@api_router.post("/generate/outline")
-async def generate_outline(request: GenerateOutlineRequest):
-    """Generate book outline with chapter titles"""
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
-            raise HTTPException(status_code=500, detail="API key non configurata")
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"outline-{uuid.uuid4()}",
-            system_message="Sei un esperto scrittore e editor. Genera strutture di libri professionali e coinvolgenti."
-        ).with_model("openai", "gpt-5.2")
-        
-        prompt = f"""Genera una struttura per un libro sull'argomento: "{request.topic}"
-        
-Il libro deve avere {request.chapter_count} capitoli.
-Stile: {request.style}
-Lingua: {request.language}
-
-Rispondi SOLO con un JSON valido nel seguente formato, senza altro testo:
-{{
-    "title": "Titolo del libro",
-    "description": "Breve descrizione del libro (2-3 frasi)",
-    "chapters": [
-        {{"title": "Titolo Capitolo 1", "summary": "Breve descrizione del capitolo"}},
-        {{"title": "Titolo Capitolo 2", "summary": "Breve descrizione del capitolo"}}
+def generate_match_exercise(difficulty: str) -> Dict:
+    """Generate a matching exercise"""
+    word_pairs = [
+        ("MELA", "frutta rossa"),
+        ("CANE", "animale domestico"),
+        ("SOLE", "stella nel cielo"),
+        ("CASA", "dove abitiamo"),
+        ("LIBRO", "da leggere"),
+        ("PANE", "da mangiare"),
+        ("ACQUA", "da bere"),
+        ("FIORE", "nel giardino"),
+        ("ALBERO", "ha le foglie"),
+        ("GATTO", "fa miao"),
+        ("UCCELLO", "vola nel cielo"),
+        ("PESCE", "nuota nell'acqua"),
     ]
-}}"""
+    
+    count = 3 if difficulty == "easy" else (4 if difficulty == "medium" else 5)
+    selected = random.sample(word_pairs, count)
+    
+    words = [p[0] for p in selected]
+    definitions = [p[1] for p in selected]
+    random.shuffle(definitions)
+    
+    return {
+        "words": words,
+        "definitions": definitions,
+        "answers": {p[0]: p[1] for p in selected}
+    }
 
-        message = UserMessage(text=prompt)
-        response = await chat.send_message(message)
+def generate_odd_one_out_exercise(difficulty: str) -> Dict:
+    """Generate find the odd one out exercise"""
+    categories = [
+        {"items": ["MELA", "PERA", "BANANA", "SEDIA"], "odd": "SEDIA", "category": "frutta"},
+        {"items": ["CANE", "GATTO", "TAVOLO", "CAVALLO"], "odd": "TAVOLO", "category": "animali"},
+        {"items": ["ROSSO", "BLU", "VERDE", "PANE"], "odd": "PANE", "category": "colori"},
+        {"items": ["UNO", "DUE", "TRE", "CASA"], "odd": "CASA", "category": "numeri"},
+        {"items": ["GENNAIO", "MARZO", "LIBRO", "LUGLIO"], "odd": "LIBRO", "category": "mesi"},
+        {"items": ["FORCHETTA", "COLTELLO", "CUCCHIAIO", "SCARPA"], "odd": "SCARPA", "category": "posate"},
+        {"items": ["OCCHI", "NASO", "BOCCA", "TELEFONO"], "odd": "TELEFONO", "category": "parti del viso"},
+    ]
+    
+    selected = random.choice(categories)
+    items = selected["items"].copy()
+    random.shuffle(items)
+    
+    return {
+        "items": items,
+        "answer": selected["odd"],
+        "category": selected["category"]
+    }
+
+def generate_copy_exercise(difficulty: str) -> Dict:
+    """Generate a copy/write exercise"""
+    if difficulty == "easy":
+        words = ["CASA", "MAMMA", "PAPÀ", "SOLE", "LUNA", "MARE", "CIAO", "AMORE"]
+        word = random.choice(words)
+        return {"text": word, "type": "word"}
+    elif difficulty == "medium":
+        phrases = [
+            "BUON GIORNO",
+            "COME STAI",
+            "GRAZIE MILLE",
+            "TI VOGLIO BENE",
+            "BELLA GIORNATA"
+        ]
+        return {"text": random.choice(phrases), "type": "phrase"}
+    else:
+        sentences = [
+            "IL SOLE SPLENDE NEL CIELO",
+            "IL GATTO DORME SUL DIVANO",
+            "OGGI È UNA BELLA GIORNATA",
+            "MI PIACE LEGGERE I LIBRI"
+        ]
+        return {"text": random.choice(sentences), "type": "sentence"}
+
+def generate_recognition_exercise(difficulty: str) -> Dict:
+    """Generate a recognition exercise"""
+    objects = [
+        {"name": "OROLOGIO", "hint": "Segna le ore"},
+        {"name": "TELEFONO", "hint": "Per chiamare"},
+        {"name": "CHIAVI", "hint": "Aprono la porta"},
+        {"name": "OCCHIALI", "hint": "Per vedere meglio"},
+        {"name": "PETTINE", "hint": "Per i capelli"},
+        {"name": "TAZZA", "hint": "Per bere"},
+        {"name": "FORBICI", "hint": "Per tagliare"},
+        {"name": "OMBRELLO", "hint": "Quando piove"},
+    ]
+    
+    count = 3 if difficulty == "easy" else (4 if difficulty == "medium" else 6)
+    selected = random.sample(objects, count)
+    
+    return {
+        "objects": selected,
+        "show_hints": difficulty != "hard"
+    }
+
+def generate_memory_exercise(difficulty: str) -> Dict:
+    """Generate a memory exercise (pairs)"""
+    symbols = ["★", "●", "■", "▲", "♦", "♥", "♣", "♠", "○", "□"]
+    
+    count = 3 if difficulty == "easy" else (4 if difficulty == "medium" else 6)
+    selected = random.sample(symbols, count)
+    pairs = selected * 2
+    random.shuffle(pairs)
+    
+    return {
+        "cards": pairs,
+        "pairs_count": count
+    }
+
+@api_router.post("/generate/exercise")
+async def generate_exercise(request: GenerateExerciseRequest):
+    """Generate a single exercise"""
+    try:
+        exercises = []
         
-        # Parse JSON response
-        import json
-        # Clean response - remove markdown code blocks if present
-        clean_response = response.strip()
-        if clean_response.startswith("```"):
-            clean_response = clean_response.split("\n", 1)[1]
-        if clean_response.endswith("```"):
-            clean_response = clean_response.rsplit("```", 1)[0]
-        clean_response = clean_response.strip()
+        for _ in range(request.quantity):
+            exercise_id = str(uuid.uuid4())
+            exercise_type = request.exercise_type
+            difficulty = request.difficulty
+            
+            # Generate content based on type
+            if exercise_type == "sequence":
+                content = generate_sequence_exercise(difficulty)
+                title = "Completa la Sequenza"
+                instruction = "Quale numero manca? Scrivi il numero al posto del punto interrogativo."
+            
+            elif exercise_type == "math":
+                content = generate_math_exercise(difficulty)
+                title = "Calcola"
+                instruction = f"Quanto fa {content['operand1']} {content['operator']} {content['operand2']}?"
+            
+            elif exercise_type == "match":
+                content = generate_match_exercise(difficulty)
+                title = "Collega"
+                instruction = "Collega ogni parola alla sua descrizione."
+            
+            elif exercise_type == "odd_one_out":
+                content = generate_odd_one_out_exercise(difficulty)
+                title = "Trova l'Intruso"
+                instruction = "Quale parola non appartiene al gruppo? Cerchiala."
+            
+            elif exercise_type == "copy":
+                content = generate_copy_exercise(difficulty)
+                title = "Copia e Scrivi"
+                instruction = "Riscrivi la parola/frase nello spazio sottostante."
+            
+            elif exercise_type == "recognition":
+                content = generate_recognition_exercise(difficulty)
+                title = "Riconosci gli Oggetti"
+                instruction = "Scrivi il nome di ogni oggetto."
+            
+            elif exercise_type == "memory":
+                content = generate_memory_exercise(difficulty)
+                title = "Memoria"
+                instruction = "Trova le coppie di simboli uguali."
+            
+            else:
+                content = {}
+                title = EXERCISE_TYPES.get(exercise_type, {}).get("name", "Esercizio")
+                instruction = EXERCISE_TYPES.get(exercise_type, {}).get("description", "")
+            
+            exercise = Exercise(
+                id=exercise_id,
+                type=exercise_type,
+                title=title,
+                instruction=instruction,
+                difficulty=difficulty,
+                content=content
+            )
+            exercises.append(exercise.model_dump())
         
-        outline = json.loads(clean_response)
-        return outline
+        return {"exercises": exercises}
         
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON parse error: {e}, response: {response}")
-        raise HTTPException(status_code=500, detail="Errore nel parsing della risposta AI")
     except Exception as e:
-        logging.error(f"Generate outline error: {e}")
+        logging.error(f"Generate exercise error: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
 
-@api_router.post("/generate/content")
-async def generate_content(request: GenerateContentRequest):
-    """Generate chapter content"""
+@api_router.post("/generate/chapter")
+async def generate_chapter(request: GenerateChapterRequest):
+    """Generate a complete chapter with exercises"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chapter_id = str(uuid.uuid4())
+        exercises = []
         
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
-            raise HTTPException(status_code=500, detail="API key non configurata")
+        for i in range(request.exercise_count):
+            ex_request = GenerateExerciseRequest(
+                exercise_type=request.exercise_type,
+                difficulty=request.difficulty,
+                quantity=1,
+                color_mode=request.color_mode
+            )
+            result = await generate_exercise(ex_request)
+            if result["exercises"]:
+                exercises.append(result["exercises"][0])
         
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"content-{uuid.uuid4()}",
-            system_message="Sei un esperto scrittore. Scrivi contenuti professionali, coinvolgenti e ben strutturati per libri."
-        ).with_model("openai", "gpt-5.2")
+        chapter = Chapter(
+            id=chapter_id,
+            title=request.chapter_title,
+            description=f"Esercizi di {EXERCISE_TYPES.get(request.exercise_type, {}).get('name', request.exercise_type)}",
+            exercise_type=request.exercise_type,
+            exercises=[Exercise(**ex) for ex in exercises]
+        )
         
-        prompt = f"""Scrivi il contenuto per un capitolo di libro.
-
-Argomento del libro: {request.topic}
-Titolo del capitolo: {request.chapter_title}
-Lunghezza desiderata: circa {request.word_count} parole
-Stile: {request.style}
-Lingua: {request.language}
-
-Scrivi il contenuto del capitolo in modo professionale e coinvolgente. 
-Includi sottosezioni se appropriato. Non includere il titolo del capitolo nella risposta.
-Usa paragrafi ben strutturati."""
-
-        message = UserMessage(text=prompt)
-        response = await chat.send_message(message)
-        
-        return {"content": response}
+        return chapter.model_dump()
         
     except Exception as e:
-        logging.error(f"Generate content error: {e}")
+        logging.error(f"Generate chapter error: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
 
 @api_router.post("/generate/image")
-async def generate_image(request: GenerateImageRequest):
-    """Generate an image using AI"""
+async def generate_exercise_image(request: GenerateExerciseRequest):
+    """Generate an image for exercises using AI"""
     try:
         from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
         
@@ -330,10 +500,22 @@ async def generate_image(request: GenerateImageRequest):
         
         image_gen = OpenAIImageGeneration(api_key=api_key)
         
-        enhanced_prompt = f"{request.prompt}, {request.style} style, high quality, professional"
+        # Build prompt based on exercise type
+        style = "simple line drawing, black and white, clear outlines, suitable for elderly people, large and clear"
+        if request.color_mode == "color":
+            style = "simple colorful illustration, clear shapes, high contrast, suitable for elderly people, large and clear"
+        
+        prompts = {
+            "differences": f"Two similar simple drawings side by side with 3-5 subtle differences, {style}",
+            "maze": f"Simple maze puzzle with clear path, not too complex, {style}",
+            "coloring": f"Simple outline drawing of a {request.topic or 'flower'} for coloring, {style}",
+            "recognition": f"Clear simple drawings of common household objects arranged in a grid, {style}",
+        }
+        
+        prompt = prompts.get(request.exercise_type, f"Simple illustration for cognitive exercise, {style}")
         
         images = await image_gen.generate_images(
-            prompt=enhanced_prompt,
+            prompt=prompt,
             model="gpt-image-1",
             number_of_images=1
         )
@@ -349,7 +531,7 @@ async def generate_image(request: GenerateImageRequest):
         raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
 
 @api_router.post("/generate/cover")
-async def generate_cover(request: GenerateCoverRequest):
+async def generate_cover(title: str = "Quaderno di Esercizi", style: str = "simple"):
     """Generate a book cover"""
     try:
         from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
@@ -360,20 +542,12 @@ async def generate_cover(request: GenerateCoverRequest):
         
         image_gen = OpenAIImageGeneration(api_key=api_key)
         
-        style_descriptions = {
-            "modern": "modern minimalist book cover design, clean typography, contemporary style",
-            "classic": "classic elegant book cover, traditional publishing style, sophisticated",
-            "artistic": "artistic creative book cover, unique visual design, eye-catching",
-            "photo": "photographic book cover, professional photography based, high quality image"
-        }
-        
-        style_desc = style_descriptions.get(request.style, style_descriptions["modern"])
-        
-        prompt = f"""Professional book cover for a book titled "{request.title}" by {request.author}.
-Topic: {request.topic}
-Style: {style_desc}
-The cover should be visually striking and suitable for Amazon KDP publishing.
-Do NOT include any text on the cover - just the visual design/imagery."""
+        prompt = f"""Book cover for cognitive exercises workbook titled "{title}". 
+        Simple, calming design with soft colors. 
+        Clear, large typography area at top.
+        Gentle, reassuring imagery like nature elements or simple geometric patterns.
+        Professional but warm and inviting. Suitable for elderly audience.
+        No text on the image."""
         
         images = await image_gen.generate_images(
             prompt=prompt,
@@ -391,7 +565,7 @@ Do NOT include any text on the cover - just the visual design/imagery."""
         logging.error(f"Generate cover error: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nella generazione: {str(e)}")
 
-# Include the router in the main app
+# Include the router
 app.include_router(api_router)
 
 app.add_middleware(
@@ -402,7 +576,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'

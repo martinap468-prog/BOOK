@@ -31,65 +31,49 @@ export const bookApi = {
   }
 };
 
-// Chapter API
-export const chapterApi = {
-  add: async (bookId, chapter) => {
-    const response = await axios.post(`${API}/books/${bookId}/chapters`, chapter);
-    return response.data;
-  },
-
-  update: async (bookId, chapterId, updateData) => {
-    const response = await axios.put(`${API}/books/${bookId}/chapters/${chapterId}`, updateData);
-    return response.data;
-  },
-
-  delete: async (bookId, chapterId) => {
-    const response = await axios.delete(`${API}/books/${bookId}/chapters/${chapterId}`);
-    return response.data;
-  }
+// Exercise Types
+export const getExerciseTypes = async () => {
+  const response = await axios.get(`${API}/exercise-types`);
+  return response.data;
 };
 
-// AI Generation API
+// Generation API
 export const generateApi = {
-  outline: async (topic, chapterCount = 5, style = 'informativo') => {
-    const response = await axios.post(`${API}/generate/outline`, {
-      topic,
-      chapter_count: chapterCount,
-      style,
-      language: 'italiano'
+  exercise: async (exerciseType, difficulty = 'medium', quantity = 1, colorMode = 'bw', topic = null) => {
+    const response = await axios.post(`${API}/generate/exercise`, {
+      exercise_type: exerciseType,
+      difficulty,
+      quantity,
+      color_mode: colorMode,
+      topic
     });
     return response.data;
   },
 
-  content: async (topic, chapterTitle, wordCount = 500, style = 'informativo') => {
-    const response = await axios.post(`${API}/generate/content`, {
-      topic,
+  chapter: async (chapterTitle, exerciseType, difficulty = 'medium', exerciseCount = 5, colorMode = 'bw') => {
+    const response = await axios.post(`${API}/generate/chapter`, {
       chapter_title: chapterTitle,
-      word_count: wordCount,
-      style,
-      language: 'italiano'
+      exercise_type: exerciseType,
+      difficulty,
+      exercise_count: exerciseCount,
+      color_mode: colorMode
     });
     return response.data;
   },
 
-  image: async (prompt, style = 'realistic') => {
+  image: async (exerciseType, colorMode = 'bw', topic = null) => {
     const response = await axios.post(`${API}/generate/image`, {
-      prompt,
-      style,
-      size: '1024x1024'
+      exercise_type: exerciseType,
+      color_mode: colorMode,
+      topic
     });
     return response.data;
   },
 
-  cover: async (title, author, topic, style = 'modern') => {
-    const response = await axios.post(`${API}/generate/cover`, {
-      title,
-      author,
-      topic,
-      style
-    });
+  cover: async (title, style = 'simple') => {
+    const response = await axios.post(`${API}/generate/cover?title=${encodeURIComponent(title)}&style=${style}`);
     return response.data;
   }
 };
 
-export default { bookApi, chapterApi, generateApi };
+export default { bookApi, generateApi, getExerciseTypes };

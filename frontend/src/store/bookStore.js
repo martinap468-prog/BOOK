@@ -2,28 +2,26 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 const defaultSettings = {
-  page_count: 50,
-  chapter_count: 5,
-  color_mode: 'color',
-  format: '6x9',
-  font_family: 'Crimson Pro',
-  font_size: 12,
-  line_height: 1.6
+  format: '8.5x11',
+  color_mode: 'bw',
+  font_size: 18,
+  exercises_per_page: 1,
+  difficulty: 'medium',
+  include_solutions: true
 };
 
 const useBookStore = create(
   persist(
     (set, get) => ({
-      // Current book state
       currentBook: null,
       books: [],
       selectedChapterIndex: 0,
+      selectedExerciseIndex: 0,
       isLoading: false,
       isSaving: false,
       error: null,
 
-      // Actions
-      setCurrentBook: (book) => set({ currentBook: book, selectedChapterIndex: 0 }),
+      setCurrentBook: (book) => set({ currentBook: book, selectedChapterIndex: 0, selectedExerciseIndex: 0 }),
       
       setBooks: (books) => set({ books }),
       
@@ -43,7 +41,26 @@ const useBookStore = create(
         currentBook: state.currentBook?.id === bookId ? null : state.currentBook
       })),
 
-      selectChapter: (index) => set({ selectedChapterIndex: index }),
+      // Chapter management
+      selectChapter: (index) => set({ selectedChapterIndex: index, selectedExerciseIndex: 0 }),
+      
+      addChapter: (chapter) => set((state) => {
+        if (!state.currentBook) return state;
+        const newChapter = {
+          id: crypto.randomUUID(),
+          title: chapter.title || `Capitolo ${state.currentBook.chapters.length + 1}`,
+          description: chapter.description || '',
+          exercise_type: chapter.exercise_type || 'mixed',
+          exercises: chapter.exercises || [],
+          order: state.currentBook.chapters.length
+        };
+        return {
+          currentBook: {
+            ...state.currentBook,
+            chapters: [...state.currentBook.chapters, newChapter]
+          }
+        };
+      }),
       
       updateChapter: (chapterIndex, updates) => set((state) => {
         if (!state.currentBook) return state;
@@ -51,23 +68,6 @@ const useBookStore = create(
         chapters[chapterIndex] = { ...chapters[chapterIndex], ...updates };
         return {
           currentBook: { ...state.currentBook, chapters }
-        };
-      }),
-      
-      addChapter: (chapter) => set((state) => {
-        if (!state.currentBook) return state;
-        const newChapter = {
-          id: crypto.randomUUID(),
-          title: chapter.title || `Capitolo ${state.currentBook.chapters.length + 1}`,
-          content: chapter.content || '',
-          order: state.currentBook.chapters.length,
-          images: []
-        };
-        return {
-          currentBook: {
-            ...state.currentBook,
-            chapters: [...state.currentBook.chapters, newChapter]
-          }
         };
       }),
       
@@ -79,11 +79,47 @@ const useBookStore = create(
           selectedChapterIndex: Math.min(state.selectedChapterIndex, chapters.length - 1)
         };
       }),
+
+      // Exercise management
+      selectExercise: (index) => set({ selectedExerciseIndex: index }),
       
-      reorderChapters: (newOrder) => set((state) => {
+      addExercise: (chapterIndex, exercise) => set((state) => {
         if (!state.currentBook) return state;
+        const chapters = [...state.currentBook.chapters];
+        chapters[chapterIndex].exercises = [...chapters[chapterIndex].exercises, exercise];
         return {
-          currentBook: { ...state.currentBook, chapters: newOrder }
+          currentBook: { ...state.currentBook, chapters }
+        };
+      }),
+
+      addExercises: (chapterIndex, exercises) => set((state) => {
+        if (!state.currentBook) return state;
+        const chapters = [...state.currentBook.chapters];
+        chapters[chapterIndex].exercises = [...chapters[chapterIndex].exercises, ...exercises];
+        return {
+          currentBook: { ...state.currentBook, chapters }
+        };
+      }),
+      
+      updateExercise: (chapterIndex, exerciseIndex, updates) => set((state) => {
+        if (!state.currentBook) return state;
+        const chapters = [...state.currentBook.chapters];
+        chapters[chapterIndex].exercises[exerciseIndex] = {
+          ...chapters[chapterIndex].exercises[exerciseIndex],
+          ...updates
+        };
+        return {
+          currentBook: { ...state.currentBook, chapters }
+        };
+      }),
+      
+      removeExercise: (chapterIndex, exerciseIndex) => set((state) => {
+        if (!state.currentBook) return state;
+        const chapters = [...state.currentBook.chapters];
+        chapters[chapterIndex].exercises = chapters[chapterIndex].exercises.filter((_, i) => i !== exerciseIndex);
+        return {
+          currentBook: { ...state.currentBook, chapters },
+          selectedExerciseIndex: Math.min(state.selectedExerciseIndex, chapters[chapterIndex].exercises.length - 1)
         };
       }),
 
@@ -108,24 +144,30 @@ const useBookStore = create(
       setSaving: (isSaving) => set({ isSaving }),
       setError: (error) => set({ error }),
 
-      // Get current chapter
       getCurrentChapter: () => {
         const state = get();
         if (!state.currentBook || !state.currentBook.chapters.length) return null;
         return state.currentBook.chapters[state.selectedChapterIndex];
       },
 
-      // Reset store
+      getCurrentExercise: () => {
+        const state = get();
+        const chapter = state.currentBook?.chapters?.[state.selectedChapterIndex];
+        if (!chapter || !chapter.exercises.length) return null;
+        return chapter.exercises[state.selectedExerciseIndex];
+      },
+
       reset: () => set({
         currentBook: null,
         selectedChapterIndex: 0,
+        selectedExerciseIndex: 0,
         isLoading: false,
         isSaving: false,
         error: null
       })
     }),
     {
-      name: 'book-creator-storage',
+      name: 'cognitive-exercises-storage',
       partialize: (state) => ({
         books: state.books,
         currentBook: state.currentBook

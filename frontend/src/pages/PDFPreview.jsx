@@ -1,26 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft,
   Download,
   Loader2,
-  FileText,
-  BookOpen,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Brain
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import useBookStore from '../store/bookStore';
 import { bookApi } from '../services/api';
+import ExerciseRenderer from '../components/ExerciseRenderer';
 
 const FORMAT_SIZES = {
-  '5x8': { width: 5, height: 8, label: '5" x 8"', pxWidth: 360, pxHeight: 576 },
-  '6x9': { width: 6, height: 9, label: '6" x 9"', pxWidth: 432, pxHeight: 648 },
-  '8.5x11': { width: 8.5, height: 11, label: '8.5" x 11"', pxWidth: 612, pxHeight: 792 },
+  '5x8': { width: 5, height: 8, label: '5" x 8"' },
+  '6x9': { width: 6, height: 9, label: '6" x 9"' },
+  '8.5x11': { width: 8.5, height: 11, label: '8.5" x 11"' },
 };
 
 export default function PDFPreview() {
@@ -29,7 +28,6 @@ export default function PDFPreview() {
   const { currentBook, setCurrentBook, setLoading, isLoading } = useBookStore();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const previewRef = useRef(null);
 
   useEffect(() => {
     if (bookId && !currentBook) {
@@ -44,11 +42,47 @@ export default function PDFPreview() {
       setCurrentBook(book);
     } catch (error) {
       console.error('Error loading book:', error);
-      toast.error('Errore nel caricamento del libro');
+      toast.error('Errore nel caricamento');
       navigate('/');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Build pages for preview
+  const buildPreviewPages = () => {
+    if (!currentBook) return [];
+    
+    const pages = [];
+    
+    // Title page
+    pages.push({ 
+      type: 'title', 
+      title: currentBook.title,
+      subtitle: currentBook.subtitle,
+      author: currentBook.author
+    });
+    
+    // Exercise pages (1 per page)
+    for (const chapter of currentBook.chapters || []) {
+      // Chapter title page
+      pages.push({
+        type: 'chapter_title',
+        title: chapter.title,
+        description: chapter.description,
+        exerciseCount: chapter.exercises?.length || 0
+      });
+      
+      // Each exercise on its own page
+      for (const exercise of chapter.exercises || []) {
+        pages.push({
+          type: 'exercise',
+          exercise
+        });
+      }
+    }
+    
+    return pages;
   };
 
   const generatePDF = async () => {
@@ -58,10 +92,10 @@ export default function PDFPreview() {
     toast.info('Generazione PDF in corso...');
 
     try {
-      const format = FORMAT_SIZES[currentBook.settings?.format || '6x9'];
+      const format = FORMAT_SIZES[currentBook.settings?.format || '8.5x11'];
       const settings = currentBook.settings || {};
+      const fontSize = settings.font_size || 18;
       
-      // Create PDF with correct dimensions (in inches, converted to points)
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'in',
@@ -70,116 +104,208 @@ export default function PDFPreview() {
 
       const pageWidth = format.width;
       const pageHeight = format.height;
-      const margin = 0.75; // 0.75 inch margins
+      const margin = 0.75;
       const contentWidth = pageWidth - (margin * 2);
-      const contentHeight = pageHeight - (margin * 2);
 
-      // Font settings
-      const fontFamily = settings.font_family || 'helvetica';
-      const fontSize = settings.font_size || 12;
-      const lineHeight = settings.line_height || 1.6;
-
-      // Add cover page if exists
-      if (currentBook.cover_image) {
-        try {
-          const coverImg = new Image();
-          coverImg.src = `data:image/png;base64,${currentBook.cover_image}`;
-          await new Promise((resolve) => {
-            coverImg.onload = resolve;
-          });
-          pdf.addImage(coverImg, 'PNG', 0, 0, pageWidth, pageHeight);
-          pdf.addPage();
-        } catch (e) {
-          console.error('Error adding cover:', e);
-        }
-      }
-
-      // Title page
+      // Title Page
       pdf.setFontSize(28);
       pdf.setFont('helvetica', 'bold');
-      const titleLines = pdf.splitTextToSize(currentBook.title || 'Senza Titolo', contentWidth);
-      const titleY = pageHeight * 0.4;
+      const titleLines = pdf.splitTextToSize(currentBook.title || 'Quaderno di Esercizi', contentWidth);
+      let y = pageHeight * 0.35;
       titleLines.forEach((line, i) => {
-        const textWidth = pdf.getTextWidth(line);
-        pdf.text(line, (pageWidth - textWidth) / 2, titleY + (i * 0.4));
+        const w = pdf.getTextWidth(line);
+        pdf.text(line, (pageWidth - w) / 2, y + i * 0.4);
       });
 
-      if (currentBook.author) {
-        pdf.setFontSize(16);
+      if (currentBook.subtitle) {
+        pdf.setFontSize(18);
         pdf.setFont('helvetica', 'normal');
-        const authorWidth = pdf.getTextWidth(currentBook.author);
-        pdf.text(currentBook.author, (pageWidth - authorWidth) / 2, titleY + (titleLines.length * 0.4) + 0.5);
+        y += titleLines.length * 0.4 + 0.3;
+        const w = pdf.getTextWidth(currentBook.subtitle);
+        pdf.text(currentBook.subtitle, (pageWidth - w) / 2, y);
       }
 
-      // Add chapters
+      if (currentBook.author) {
+        pdf.setFontSize(14);
+        y += 0.5;
+        const w = pdf.getTextWidth(currentBook.author);
+        pdf.text(currentBook.author, (pageWidth - w) / 2, y);
+      }
+
+      // Generate pages for each chapter and exercise
       for (const chapter of currentBook.chapters || []) {
+        // Chapter title page
         pdf.addPage();
-        
-        // Chapter title
-        pdf.setFontSize(20);
+        pdf.setFontSize(24);
         pdf.setFont('helvetica', 'bold');
-        const chapterTitleLines = pdf.splitTextToSize(chapter.title || 'Capitolo', contentWidth);
-        let yPosition = margin + 0.5;
-        chapterTitleLines.forEach((line) => {
-          pdf.text(line, margin, yPosition);
-          yPosition += 0.35;
+        const chapterTitleLines = pdf.splitTextToSize(chapter.title, contentWidth);
+        y = pageHeight * 0.4;
+        chapterTitleLines.forEach((line, i) => {
+          const w = pdf.getTextWidth(line);
+          pdf.text(line, (pageWidth - w) / 2, y + i * 0.35);
         });
-        
-        yPosition += 0.3;
 
-        // Chapter content
-        if (chapter.content) {
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'normal');
+        y += chapterTitleLines.length * 0.35 + 0.3;
+        const countText = `${chapter.exercises?.length || 0} esercizi`;
+        const w = pdf.getTextWidth(countText);
+        pdf.text(countText, (pageWidth - w) / 2, y);
+
+        // Each exercise
+        for (let i = 0; i < (chapter.exercises?.length || 0); i++) {
+          const exercise = chapter.exercises[i];
+          pdf.addPage();
+
+          // Exercise header
           pdf.setFontSize(fontSize);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(exercise.title || 'Esercizio', margin, margin + 0.3);
+
+          pdf.setFontSize(fontSize - 4);
           pdf.setFont('helvetica', 'normal');
-          
-          const paragraphs = chapter.content.split('\n\n');
-          
-          for (const paragraph of paragraphs) {
-            const lines = pdf.splitTextToSize(paragraph.trim(), contentWidth);
-            
-            for (const line of lines) {
-              if (yPosition > pageHeight - margin) {
-                pdf.addPage();
-                yPosition = margin;
-              }
-              pdf.text(line, margin, yPosition);
-              yPosition += (fontSize / 72) * lineHeight;
-            }
-            
-            yPosition += (fontSize / 72) * 0.5; // Paragraph spacing
-          }
-        }
+          const instructionLines = pdf.splitTextToSize(exercise.instruction || '', contentWidth);
+          y = margin + 0.7;
+          instructionLines.forEach((line, idx) => {
+            pdf.text(line, margin, y + idx * 0.25);
+          });
+          y += instructionLines.length * 0.25 + 0.5;
 
-        // Add chapter images
-        if (chapter.images?.length > 0) {
-          for (const imgBase64 of chapter.images) {
-            if (yPosition > pageHeight - margin - 3) {
-              pdf.addPage();
-              yPosition = margin;
-            }
-
-            try {
-              const img = new Image();
-              img.src = `data:image/png;base64,${imgBase64}`;
-              await new Promise((resolve) => {
-                img.onload = resolve;
-              });
-              
-              const imgWidth = contentWidth * 0.8;
-              const imgHeight = imgWidth * (img.height / img.width);
-              const imgX = (pageWidth - imgWidth) / 2;
-              
-              pdf.addImage(img, 'PNG', imgX, yPosition, imgWidth, imgHeight);
-              yPosition += imgHeight + 0.5;
-            } catch (e) {
-              console.error('Error adding image:', e);
-            }
+          // Exercise content based on type
+          pdf.setFontSize(fontSize);
+          
+          if (exercise.type === 'sequence') {
+            const sequence = exercise.content?.sequence || [];
+            const boxSize = 0.8;
+            const startX = (pageWidth - sequence.length * (boxSize + 0.2)) / 2;
+            
+            sequence.forEach((item, idx) => {
+              const x = startX + idx * (boxSize + 0.2);
+              pdf.rect(x, y, boxSize, boxSize);
+              pdf.setFont('helvetica', item === '?' ? 'bold' : 'normal');
+              const textW = pdf.getTextWidth(String(item));
+              pdf.text(String(item), x + (boxSize - textW) / 2, y + boxSize * 0.65);
+            });
+            
+            y += boxSize + 0.8;
+            pdf.setFontSize(fontSize - 2);
+            pdf.text('La risposta è: _______', margin, y);
           }
+          
+          else if (exercise.type === 'math') {
+            const { operand1, operator, operand2 } = exercise.content || {};
+            pdf.setFontSize(fontSize + 8);
+            pdf.setFont('helvetica', 'bold');
+            const mathText = `${operand1} ${operator} ${operand2} = ?`;
+            const mathW = pdf.getTextWidth(mathText);
+            pdf.text(mathText, (pageWidth - mathW) / 2, y + 0.5);
+            
+            y += 1.5;
+            pdf.setFontSize(fontSize - 2);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Risposta: _______', margin, y);
+          }
+          
+          else if (exercise.type === 'odd_one_out') {
+            const items = exercise.content?.items || [];
+            const boxWidth = 1.5;
+            const boxHeight = 0.6;
+            const cols = 2;
+            
+            items.forEach((item, idx) => {
+              const col = idx % cols;
+              const row = Math.floor(idx / cols);
+              const x = margin + col * (boxWidth + 0.5);
+              const itemY = y + row * (boxHeight + 0.3);
+              
+              pdf.rect(x, itemY, boxWidth, boxHeight);
+              pdf.setFontSize(fontSize - 2);
+              const textW = pdf.getTextWidth(item);
+              pdf.text(item, x + (boxWidth - textW) / 2, itemY + boxHeight * 0.65);
+            });
+            
+            y += Math.ceil(items.length / cols) * (boxHeight + 0.3) + 0.5;
+            pdf.setFontSize(fontSize - 2);
+            pdf.text('Cerchia l\'intruso!', margin, y);
+          }
+          
+          else if (exercise.type === 'copy') {
+            const text = exercise.content?.text || '';
+            pdf.setFontSize(fontSize + 4);
+            pdf.setFont('helvetica', 'bold');
+            const textW = pdf.getTextWidth(text);
+            pdf.text(text, (pageWidth - textW) / 2, y + 0.5);
+            
+            y += 1.2;
+            pdf.setFontSize(fontSize - 2);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Riscrivi qui sotto:', margin, y);
+            
+            // Lines for writing
+            for (let line = 0; line < 3; line++) {
+              y += 0.6;
+              pdf.setDrawColor(180);
+              pdf.setLineDashPattern([0.05, 0.05], 0);
+              pdf.line(margin, y, pageWidth - margin, y);
+            }
+            pdf.setLineDashPattern([], 0);
+            pdf.setDrawColor(0);
+          }
+          
+          else if (exercise.type === 'match') {
+            const words = exercise.content?.words || [];
+            const definitions = exercise.content?.definitions || [];
+            
+            pdf.setFontSize(fontSize - 2);
+            
+            // Words column
+            words.forEach((word, idx) => {
+              pdf.text(`${idx + 1}. ${word}`, margin, y + idx * 0.4);
+            });
+            
+            // Definitions column
+            definitions.forEach((def, idx) => {
+              pdf.text(`${String.fromCharCode(65 + idx)}. ${def}`, pageWidth / 2, y + idx * 0.4);
+            });
+            
+            y += Math.max(words.length, definitions.length) * 0.4 + 0.5;
+            pdf.text('Collega (es: 1-A, 2-B):', margin, y);
+            y += 0.4;
+            words.forEach((_, idx) => {
+              pdf.text(`${idx + 1} → ___`, margin + (idx % 3) * 1.5, y + Math.floor(idx / 3) * 0.4);
+            });
+          }
+          
+          else if (exercise.type === 'memory') {
+            const cards = exercise.content?.cards || [];
+            const cardSize = 0.6;
+            const cols = 4;
+            const startX = (pageWidth - cols * (cardSize + 0.15)) / 2;
+            
+            cards.forEach((symbol, idx) => {
+              const col = idx % cols;
+              const row = Math.floor(idx / cols);
+              const x = startX + col * (cardSize + 0.15);
+              const cardY = y + row * (cardSize + 0.15);
+              
+              pdf.rect(x, cardY, cardSize, cardSize);
+              pdf.setFontSize(fontSize);
+              const textW = pdf.getTextWidth(symbol);
+              pdf.text(symbol, x + (cardSize - textW) / 2, cardY + cardSize * 0.7);
+            });
+          }
+
+          // Page number
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+          const pageNum = `${i + 1}`;
+          const pageNumW = pdf.getTextWidth(pageNum);
+          pdf.text(pageNum, (pageWidth - pageNumW) / 2, pageHeight - 0.5);
         }
       }
 
       // Save PDF
-      const fileName = `${currentBook.title?.replace(/[^a-zA-Z0-9]/g, '_') || 'libro'}.pdf`;
+      const fileName = `${currentBook.title?.replace(/[^a-zA-Z0-9]/g, '_') || 'quaderno'}.pdf`;
       pdf.save(fileName);
       toast.success('PDF scaricato!');
     } catch (error) {
@@ -190,51 +316,18 @@ export default function PDFPreview() {
     }
   };
 
-  // Build pages for preview
-  const buildPreviewPages = () => {
-    if (!currentBook) return [];
-    
-    const pages = [];
-    
-    // Cover page
-    if (currentBook.cover_image) {
-      pages.push({ type: 'cover', image: currentBook.cover_image });
-    }
-    
-    // Title page
-    pages.push({ 
-      type: 'title', 
-      title: currentBook.title,
-      author: currentBook.author
-    });
-    
-    // Chapter pages
-    for (const chapter of currentBook.chapters || []) {
-      pages.push({
-        type: 'chapter',
-        title: chapter.title,
-        content: chapter.content,
-        images: chapter.images
-      });
-    }
-    
-    return pages;
-  };
-
   const previewPages = buildPreviewPages();
-  const format = FORMAT_SIZES[currentBook?.settings?.format || '6x9'];
-  const settings = currentBook?.settings || {};
+  const format = FORMAT_SIZES[currentBook?.settings?.format || '8.5x11'];
 
   if (isLoading || !currentBook) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
-          <p className="text-muted-foreground">Caricamento...</p>
-        </div>
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
   }
+
+  const currentPageData = previewPages[currentPage];
 
   return (
     <div className="min-h-screen bg-background" data-testid="pdf-preview">
@@ -287,7 +380,6 @@ export default function PDFPreview() {
             size="icon"
             onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
             disabled={currentPage === 0}
-            data-testid="prev-page-btn"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -298,8 +390,7 @@ export default function PDFPreview() {
             variant="outline"
             size="icon"
             onClick={() => setCurrentPage(Math.min(previewPages.length - 1, currentPage + 1))}
-            disabled={currentPage === previewPages.length - 1}
-            data-testid="next-page-btn"
+            disabled={currentPage >= previewPages.length - 1}
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
@@ -308,75 +399,61 @@ export default function PDFPreview() {
         {/* Page Preview */}
         <div className="flex justify-center">
           <div 
-            ref={previewRef}
             className="bg-white border border-border shadow-lg overflow-hidden"
             style={{ 
               width: '100%',
-              maxWidth: '500px',
+              maxWidth: '600px',
               aspectRatio: `${format.width}/${format.height}`
             }}
           >
-            {previewPages[currentPage]?.type === 'cover' && (
-              <div className="w-full h-full">
-                <img
-                  src={`data:image/png;base64,${previewPages[currentPage].image}`}
-                  alt="Copertina"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
+            <ScrollArea className="h-full">
+              <div className="p-8 md:p-12" style={{ fontSize: `${currentBook.settings?.font_size || 18}pt` }}>
+                {/* Title Page */}
+                {currentPageData?.type === 'title' && (
+                  <div className="h-full flex flex-col items-center justify-center text-center min-h-[400px]">
+                    <Brain className="w-16 h-16 text-primary/30 mb-6" />
+                    <h1 className="text-3xl font-bold text-primary mb-2">
+                      {currentPageData.title}
+                    </h1>
+                    {currentPageData.subtitle && (
+                      <p className="text-xl text-muted-foreground mb-4">
+                        {currentPageData.subtitle}
+                      </p>
+                    )}
+                    {currentPageData.author && (
+                      <p className="text-lg text-muted-foreground">
+                        {currentPageData.author}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-            {previewPages[currentPage]?.type === 'title' && (
-              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-                <h1 
-                  className="text-3xl md:text-4xl font-serif font-bold text-primary mb-4"
-                  style={{ fontFamily: 'Fraunces, serif' }}
-                >
-                  {previewPages[currentPage].title}
-                </h1>
-                {previewPages[currentPage].author && (
-                  <p className="text-lg text-muted-foreground">
-                    {previewPages[currentPage].author}
-                  </p>
+                {/* Chapter Title Page */}
+                {currentPageData?.type === 'chapter_title' && (
+                  <div className="h-full flex flex-col items-center justify-center text-center min-h-[400px]">
+                    <h2 className="text-2xl font-bold text-primary mb-4">
+                      {currentPageData.title}
+                    </h2>
+                    {currentPageData.description && (
+                      <p className="text-lg text-muted-foreground mb-4">
+                        {currentPageData.description}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground">
+                      {currentPageData.exerciseCount} esercizi
+                    </p>
+                  </div>
+                )}
+
+                {/* Exercise Page */}
+                {currentPageData?.type === 'exercise' && (
+                  <ExerciseRenderer 
+                    exercise={currentPageData.exercise}
+                    colorMode={currentBook.settings?.color_mode || 'bw'}
+                  />
                 )}
               </div>
-            )}
-
-            {previewPages[currentPage]?.type === 'chapter' && (
-              <ScrollArea className="h-full">
-                <div className="p-8 md:p-12">
-                  <h2 
-                    className="text-2xl font-serif font-bold text-primary mb-6"
-                    style={{ fontFamily: 'Fraunces, serif' }}
-                  >
-                    {previewPages[currentPage].title}
-                  </h2>
-                  <div 
-                    className="prose prose-sm max-w-none text-foreground/90 whitespace-pre-wrap"
-                    style={{
-                      fontFamily: settings.font_family || 'Crimson Pro',
-                      fontSize: `${settings.font_size || 12}pt`,
-                      lineHeight: settings.line_height || 1.6
-                    }}
-                  >
-                    {previewPages[currentPage].content || 'Nessun contenuto'}
-                  </div>
-                  
-                  {previewPages[currentPage].images?.length > 0 && (
-                    <div className="mt-8 space-y-4">
-                      {previewPages[currentPage].images.map((img, i) => (
-                        <img
-                          key={i}
-                          src={`data:image/png;base64,${img}`}
-                          alt={`Illustrazione ${i + 1}`}
-                          className="w-full max-w-sm mx-auto rounded border border-border"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            )}
+            </ScrollArea>
           </div>
         </div>
 
@@ -384,30 +461,8 @@ export default function PDFPreview() {
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground">
             Formato: {format.label} • {currentBook.chapters?.length || 0} capitoli • 
-            {settings.color_mode === 'bw' ? ' Bianco e Nero' : ' A Colori'}
+            {currentBook.chapters?.reduce((acc, ch) => acc + (ch.exercises?.length || 0), 0) || 0} esercizi totali
           </p>
-        </div>
-
-        {/* Quick Navigation */}
-        <div className="mt-8">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4 text-center">
-            Navigazione Rapida
-          </h3>
-          <div className="flex flex-wrap justify-center gap-2">
-            {previewPages.map((page, index) => (
-              <Button
-                key={index}
-                variant={index === currentPage ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setCurrentPage(index)}
-                className="text-xs"
-              >
-                {page.type === 'cover' && 'Copertina'}
-                {page.type === 'title' && 'Titolo'}
-                {page.type === 'chapter' && (page.title?.substring(0, 15) || `Cap. ${index}`)}
-              </Button>
-            ))}
-          </div>
         </div>
       </main>
     </div>
