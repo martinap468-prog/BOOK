@@ -110,6 +110,47 @@ export default function ExerciseRenderer({ exercise, colorMode = 'bw' }) {
     );
   }
 
+  // Mixed/Legacy Exercise (for old data compatibility)
+  if (type === 'mixed' || !type) {
+    // Try to render based on content structure
+    if (content.sequence) {
+      return (
+        <div className="exercise-sequence" data-testid="exercise-sequence">
+          <ExerciseHeader />
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {content.sequence?.map((item, index) => (
+              <div
+                key={index}
+                className={`w-20 h-20 flex items-center justify-center text-3xl font-bold rounded-lg border-2 ${
+                  item === '?' 
+                    ? 'border-accent bg-accent/10 text-accent' 
+                    : 'border-border bg-white'
+                }`}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    // Default placeholder for legacy exercises
+    return (
+      <div className="exercise-placeholder" data-testid="exercise-placeholder">
+        <ExerciseHeader />
+        <div className="py-8 text-center">
+          <p className="text-lg text-muted-foreground mb-4">
+            Questo esercizio è in un formato legacy.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Crea un nuovo capitolo per generare esercizi con il nuovo formato.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Sequence Exercise
   if (type === 'sequence') {
     return (
