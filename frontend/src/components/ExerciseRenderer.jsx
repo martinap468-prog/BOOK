@@ -1,8 +1,9 @@
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 
 // Exercise Renderer Component - Renders different exercise types
 export default function ExerciseRenderer({ exercise, colorMode = 'bw' }) {
-  const { type, title, instruction, content, difficulty } = exercise;
+  const { type, title, instruction, content, difficulty, image_base64 } = exercise;
 
   const getDifficultyLabel = (diff) => {
     switch (diff) {
@@ -25,6 +26,89 @@ export default function ExerciseRenderer({ exercise, colorMode = 'bw' }) {
       <p className="text-lg text-muted-foreground">{instruction}</p>
     </div>
   );
+
+  // Image display component for image-based exercises
+  const ExerciseImage = ({ alt }) => {
+    if (!image_base64) {
+      return (
+        <div className="w-full h-64 bg-secondary/30 rounded-lg flex items-center justify-center border-2 border-dashed border-muted-foreground/30">
+          <div className="text-center text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+            <p>Immagine in generazione...</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <img 
+        src={`data:image/png;base64,${image_base64}`}
+        alt={alt}
+        className="w-full max-w-2xl mx-auto rounded-lg border border-border"
+      />
+    );
+  };
+
+  // Maze Exercise
+  if (type === 'maze') {
+    return (
+      <div className="exercise-maze" data-testid="exercise-maze">
+        <ExerciseHeader />
+        <ExerciseImage alt="Labirinto" />
+        <div className="mt-6 text-center text-muted-foreground">
+          <p>Usa una matita per tracciare il percorso dall'inizio alla fine</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Coloring Exercise
+  if (type === 'coloring') {
+    return (
+      <div className="exercise-coloring" data-testid="exercise-coloring">
+        <ExerciseHeader />
+        <ExerciseImage alt="Disegno da colorare" />
+        <div className="mt-6 text-center text-muted-foreground">
+          <p>Usa matite colorate o pennarelli per colorare il disegno</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Find Differences Exercise
+  if (type === 'differences') {
+    return (
+      <div className="exercise-differences" data-testid="exercise-differences">
+        <ExerciseHeader />
+        <ExerciseImage alt="Trova le differenze" />
+        <div className="mt-6 p-4 bg-secondary/30 rounded-lg">
+          <p className="font-medium mb-2">Differenze trovate:</p>
+          <div className="flex gap-2 flex-wrap">
+            {Array.from({ length: content.differences_count || 5 }, (_, i) => (
+              <div 
+                key={i}
+                className="w-10 h-10 rounded-full border-2 border-dashed border-muted-foreground flex items-center justify-center"
+              >
+                {i + 1}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Connect the Dots Exercise
+  if (type === 'connect_dots') {
+    return (
+      <div className="exercise-connect-dots" data-testid="exercise-connect-dots">
+        <ExerciseHeader />
+        <ExerciseImage alt="Unisci i puntini" />
+        <div className="mt-6 text-center text-muted-foreground">
+          <p>Collega i numeri in ordine: 1 → 2 → 3 → ... → {content.dots_count || 10}</p>
+        </div>
+      </div>
+    );
+  }
 
   // Sequence Exercise
   if (type === 'sequence') {

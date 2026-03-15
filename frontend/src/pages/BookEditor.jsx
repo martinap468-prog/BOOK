@@ -21,7 +21,8 @@ import {
   Pencil,
   Palette,
   CircleOff,
-  Search
+  Search,
+  GitBranch
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -73,7 +74,8 @@ const EXERCISE_ICONS = {
   copy: Pencil,
   coloring: Palette,
   odd_one_out: CircleOff,
-  differences: Search
+  differences: Search,
+  connect_dots: GitBranch
 };
 
 export default function BookEditor() {
@@ -169,6 +171,16 @@ export default function BookEditor() {
     if (!newChapter.title.trim()) {
       toast.error('Inserisci un titolo per il capitolo');
       return;
+    }
+
+    // Check if this is an image-based exercise type
+    const imageTypes = ['maze', 'coloring', 'differences', 'connect_dots'];
+    const hasImages = imageTypes.includes(newChapter.exercise_type);
+    
+    if (hasImages) {
+      toast.info(`Generazione in corso... Gli esercizi con immagini richiedono 30-60 secondi ciascuno.`, {
+        duration: 10000
+      });
     }
 
     setIsGenerating(true);
@@ -548,11 +560,16 @@ export default function BookEditor() {
                 <SelectContent>
                   {Object.entries(exerciseTypes).map(([key, type]) => (
                     <SelectItem key={key} value={key}>
-                      {type.name}
+                      {type.name} {type.has_image && '🎨'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {['maze', 'coloring', 'differences', 'connect_dots'].includes(newChapter.exercise_type) && (
+                <p className="text-xs text-amber-600 mt-1">
+                  ⚠️ Esercizi con immagini AI: ogni immagine richiede 30-60 secondi di generazione
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -11,6 +11,7 @@ class CognitiveExerciseAPITester:
         self.tests_run = 0
         self.tests_passed = 0
         self.errors = []
+        self.test_book_id = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, headers=None):
         """Run a single API test"""
@@ -69,13 +70,52 @@ class CognitiveExerciseAPITester:
         success, response = self.run_test("Exercise Types", "GET", "/exercise-types", 200)
         if success:
             print(f"   Available exercise types: {len(response)} types")
-            required_types = ["sequence", "math", "match", "odd_one_out", "copy", "recognition", "memory"]
-            for req_type in required_types:
-                if req_type in response:
-                    print(f"   ✓ {req_type}: {response[req_type]['name']}")
+            
+            # Test for all 11 expected exercise types
+            expected_types = ["sequence", "math", "match", "odd_one_out", "copy", "recognition", 
+                            "memory", "maze", "differences", "coloring", "connect_dots"]
+            
+            # Test for image-based exercises
+            image_exercises = []
+            text_exercises = []
+            
+            for ex_type, data in response.items():
+                has_image = data.get('has_image', False)
+                if has_image:
+                    image_exercises.append(ex_type)
                 else:
-                    print(f"   ✗ Missing: {req_type}")
-                    self.errors.append(f"Missing exercise type: {req_type}")
+                    text_exercises.append(ex_type)
+                    
+                if ex_type in expected_types:
+                    print(f"   ✓ {ex_type}: {data['name']} {'🎨' if has_image else '📝'}")
+                    
+            # Validate we have exactly 11 types
+            if len(response) != 11:
+                print(f"   ❌ Expected 11 exercise types, got {len(response)}")
+                self.errors.append(f"Expected 11 exercise types, got {len(response)}")
+                
+            # Validate image exercises
+            expected_image_types = ["maze", "differences", "coloring", "connect_dots"]
+            if set(image_exercises) != set(expected_image_types):
+                print(f"   ❌ Image exercises mismatch. Expected: {expected_image_types}, Got: {image_exercises}")
+                self.errors.append(f"Image exercises mismatch")
+            else:
+                print(f"   ✅ Correct 4 image exercises: {image_exercises}")
+                
+            # Validate text exercises
+            expected_text_types = ["sequence", "math", "match", "odd_one_out", "copy", "recognition", "memory"]
+            if set(text_exercises) != set(expected_text_types):
+                print(f"   ❌ Text exercises mismatch. Expected: {expected_text_types}, Got: {text_exercises}")
+                self.errors.append(f"Text exercises mismatch")
+            else:
+                print(f"   ✅ Correct 7 text exercises: {text_exercises}")
+                
+            # Check for missing types
+            missing_types = [t for t in expected_types if t not in response]
+            if missing_types:
+                print(f"   ❌ Missing exercise types: {missing_types}")
+                self.errors.append(f"Missing exercise types: {missing_types}")
+                
         return success, response
 
     def test_create_book(self):
@@ -145,10 +185,79 @@ class CognitiveExerciseAPITester:
         
         return passed == len(exercise_types), {"passed": passed, "total": len(exercise_types)}
 
+    def test_image_exercise_maze(self):
+        """Test maze exercise generation with image"""
+        print("   ⚠️  Image generation may take 30-60 seconds...")
+        exercise_data = {
+            "exercise_type": "maze",
+            "difficulty": "medium",
+            "quantity": 1,
+            "color_mode": "bw"
+        }
+        success, response = self.run_test("Generate Maze Exercise", "POST", "/generate/exercise", 200, exercise_data)
+        if success and 'exercises' in response:
+            exercise = response['exercises'][0]
+            print(f"   Exercise type: {exercise.get('type')}")
+            has_image = exercise.get('image_base64') is not None
+            print(f"   Has image_base64: {has_image}")
+            if has_image:
+                img_len = len(exercise.get('image_base64', ''))
+                print(f"   Image size: {img_len} characters")
+                print("   ✅ Image exercise correctly has image_base64")
+            else:
+                print("   ⚠️  Image missing - may have failed generation")
+                self.errors.append("Maze exercise missing image_base64")
+        return success, response
+
+    def test_image_exercise_coloring(self):
+        """Test coloring exercise generation with image"""
+        print("   ⚠️  Image generation may take 30-60 seconds...")
+        exercise_data = {
+            "exercise_type": "coloring",
+            "difficulty": "easy",
+            "quantity": 1,
+            "color_mode": "bw"
+        }
+        success, response = self.run_test("Generate Coloring Exercise", "POST", "/generate/exercise", 200, exercise_data)
+        if success and 'exercises' in response:
+            exercise = response['exercises'][0]
+            print(f"   Exercise type: {exercise.get('type')}")
+            has_image = exercise.get('image_base64') is not None
+            print(f"   Has image_base64: {has_image}")
+            if has_image:
+                img_len = len(exercise.get('image_base64', ''))
+                print(f"   Image size: {img_len} characters")
+                print("   ✅ Image exercise correctly has image_base64")
+            else:
+                print("   ⚠️  Image missing - may have failed generation")
+                self.errors.append("Coloring exercise missing image_base64")
+        return success, response
+
+    def test_text_exercise_no_image(self):
+        """Test that text exercises don't have images"""
+        exercise_data = {
+            "exercise_type": "sequence",
+            "difficulty": "medium",
+            "quantity": 1,
+            "color_mode": "bw"
+        }
+        success, response = self.run_test("Generate Text Exercise (No Image)", "POST", "/generate/exercise", 200, exercise_data)
+        if success and 'exercises' in response:
+            exercise = response['exercises'][0]
+            has_image = exercise.get('image_base64') is not None
+            print(f"   Text exercise has image: {has_image}")
+            if has_image:
+                print("   ❌ Text exercise should not have image_base64")
+                self.errors.append("Text exercise incorrectly has image_base64")
+                return False
+            else:
+                print("   ✅ Text exercise correctly has no image")
+        return success, response
+
 def main():
     """Main test runner"""
-    print("🧠 Cognitive Exercise API Testing")
-    print("=" * 50)
+    print("🧠 Cognitive Exercise API Testing - Image Features")
+    print("=" * 60)
     
     tester = CognitiveExerciseAPITester()
     book_id = None
@@ -164,26 +273,38 @@ def main():
     if success and 'id' in book_data:
         book_id = book_data['id']
         print(f"   Created book ID: {book_id}")
+        tester.test_book_id = book_id
     
     tester.test_get_books()
 
-    # Test exercise generation 
-    print("\n⚡ Testing Exercise Generation")
+    # Test text exercise generation 
+    print("\n📝 Testing Text Exercise Generation")
     tester.test_generate_exercise()
-    tester.test_generate_chapter()
+    tester.test_text_exercise_no_image()
+
+    # Test image exercise generation  
+    print("\n🎨 Testing Image Exercise Generation")
+    tester.test_image_exercise_maze()
+    tester.test_image_exercise_coloring()
 
     # Test all exercise types
     print("\n🎯 Testing All Exercise Types")
     tester.test_multiple_exercise_types()
+    
+    # Test chapter generation
+    print("\n📖 Testing Chapter Generation")
+    tester.test_generate_chapter()
 
     # Print final results
-    print(f"\n📊 Final Results")
+    print(f"\n📊 Final Test Results")
     print(f"Tests passed: {tester.tests_passed}/{tester.tests_run}")
     
     if tester.errors:
         print(f"\n❌ Errors found ({len(tester.errors)}):")
         for error in tester.errors:
             print(f"   - {error}")
+    else:
+        print("\n✅ All tests passed successfully!")
     
     success_rate = (tester.tests_passed / tester.tests_run * 100) if tester.tests_run > 0 else 0
     print(f"Success rate: {success_rate:.1f}%")

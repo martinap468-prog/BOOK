@@ -98,55 +98,71 @@ class GenerateChapterRequest(BaseModel):
 
 # Exercise type definitions
 EXERCISE_TYPES = {
-    "differences": {
-        "name": "Trova le Differenze",
-        "description": "Trova le differenze tra due immagini simili",
-        "icon": "search"
-    },
     "sequence": {
         "name": "Completa la Sequenza",
         "description": "Completa la sequenza di numeri, lettere o figure",
-        "icon": "list-ordered"
-    },
-    "match": {
-        "name": "Collega",
-        "description": "Collega parole e immagini corrispondenti",
-        "icon": "link"
-    },
-    "maze": {
-        "name": "Labirinto",
-        "description": "Trova la strada nel labirinto",
-        "icon": "route"
+        "icon": "list-ordered",
+        "has_image": False
     },
     "math": {
         "name": "Calcoli",
         "description": "Operazioni matematiche semplici",
-        "icon": "calculator"
+        "icon": "calculator",
+        "has_image": False
     },
-    "recognition": {
-        "name": "Riconoscimento",
-        "description": "Riconosci e nomina gli oggetti",
-        "icon": "eye"
-    },
-    "memory": {
-        "name": "Memoria",
-        "description": "Esercizi di memoria visiva",
-        "icon": "brain"
-    },
-    "copy": {
-        "name": "Copia e Scrivi",
-        "description": "Ricalca o copia parole e frasi",
-        "icon": "pencil"
-    },
-    "coloring": {
-        "name": "Colora",
-        "description": "Colora le figure",
-        "icon": "palette"
+    "match": {
+        "name": "Collega",
+        "description": "Collega parole e immagini corrispondenti",
+        "icon": "link",
+        "has_image": False
     },
     "odd_one_out": {
         "name": "Trova l'Intruso",
         "description": "Trova l'elemento diverso dagli altri",
-        "icon": "circle-off"
+        "icon": "circle-off",
+        "has_image": False
+    },
+    "copy": {
+        "name": "Copia e Scrivi",
+        "description": "Ricalca o copia parole e frasi",
+        "icon": "pencil",
+        "has_image": False
+    },
+    "recognition": {
+        "name": "Riconoscimento",
+        "description": "Riconosci e nomina gli oggetti",
+        "icon": "eye",
+        "has_image": False
+    },
+    "memory": {
+        "name": "Memoria",
+        "description": "Esercizi di memoria visiva",
+        "icon": "brain",
+        "has_image": False
+    },
+    "maze": {
+        "name": "Labirinto",
+        "description": "Trova la strada nel labirinto",
+        "icon": "route",
+        "has_image": True
+    },
+    "differences": {
+        "name": "Trova le Differenze",
+        "description": "Trova le differenze tra due immagini simili",
+        "icon": "search",
+        "has_image": True
+    },
+    "coloring": {
+        "name": "Colora",
+        "description": "Colora le figure",
+        "icon": "palette",
+        "has_image": True
+    },
+    "connect_dots": {
+        "name": "Unisci i Puntini",
+        "description": "Completa il disegno unendo i puntini numerati",
+        "icon": "git-branch",
+        "has_image": True
     }
 }
 
@@ -388,6 +404,92 @@ def generate_memory_exercise(difficulty: str) -> Dict:
         "pairs_count": count
     }
 
+# Image-based exercise generators
+IMAGE_SUBJECTS = {
+    "maze": [
+        "garden path", "forest trail", "castle maze", "simple house maze",
+        "park pathway", "beach path", "mountain trail"
+    ],
+    "coloring": [
+        "flower", "cat", "dog", "house", "tree", "sun", "butterfly",
+        "fish", "bird", "apple", "car", "boat", "star", "heart"
+    ],
+    "differences": [
+        "living room scene", "kitchen scene", "garden scene", "bedroom scene",
+        "park scene", "beach scene", "farm scene"
+    ],
+    "connect_dots": [
+        "star shape", "heart shape", "house outline", "tree outline",
+        "flower outline", "cat face", "simple boat"
+    ]
+}
+
+async def generate_image_exercise(exercise_type: str, difficulty: str, color_mode: str = "bw"):
+    """Generate an image-based exercise using AI"""
+    try:
+        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            return None, "API key non configurata"
+        
+        image_gen = OpenAIImageGeneration(api_key=api_key)
+        
+        subject = random.choice(IMAGE_SUBJECTS.get(exercise_type, ["simple object"]))
+        
+        # Build prompt based on exercise type
+        if exercise_type == "maze":
+            complexity = "very simple" if difficulty == "easy" else ("simple" if difficulty == "medium" else "moderate")
+            prompt = f"""Create a {complexity} maze puzzle for elderly cognitive exercise. 
+            The maze should have a clear START marked at top and END marked at bottom.
+            Simple rectangular maze with clear paths, thick black lines on white background.
+            The path should be wide and easy to follow with a pencil.
+            Style: clean black lines on pure white, no shading, printable.
+            Theme: {subject}"""
+        
+        elif exercise_type == "coloring":
+            detail = "very simple with minimal details" if difficulty == "easy" else ("simple" if difficulty == "medium" else "moderate detail")
+            prompt = f"""Create a {detail} coloring page outline of a {subject}.
+            Black outlines only on pure white background, no fills, no shading.
+            Large, clear shapes suitable for elderly people to color.
+            Thick clean lines, easy to see and color within.
+            Style: simple line art coloring book page, printable."""
+        
+        elif exercise_type == "differences":
+            diff_count = 3 if difficulty == "easy" else (5 if difficulty == "medium" else 7)
+            prompt = f"""Create TWO similar simple drawings side by side for a 'spot the differences' puzzle.
+            Scene: {subject}
+            The two images should have exactly {diff_count} subtle differences.
+            Style: simple black and white line drawings, clear and easy to see.
+            Both images should be clearly separated, suitable for elderly cognitive exercise."""
+        
+        elif exercise_type == "connect_dots":
+            dots = 10 if difficulty == "easy" else (15 if difficulty == "medium" else 20)
+            prompt = f"""Create a connect-the-dots puzzle that forms a {subject}.
+            Use exactly {dots} numbered dots (1 to {dots}) arranged to form the shape.
+            Numbers should be large and clearly visible.
+            When connected in order, the dots reveal the shape.
+            Style: black dots and numbers on white background, simple and clear."""
+        
+        else:
+            prompt = f"Simple black and white illustration for cognitive exercise, clear and easy to see"
+        
+        images = await image_gen.generate_images(
+            prompt=prompt,
+            model="gpt-image-1",
+            number_of_images=1
+        )
+        
+        if images and len(images) > 0:
+            image_base64 = base64.b64encode(images[0]).decode('utf-8')
+            return image_base64, None
+        else:
+            return None, "Nessuna immagine generata"
+            
+    except Exception as e:
+        logging.error(f"Generate image exercise error: {e}")
+        return None, str(e)
+
 @api_router.post("/generate/exercise")
 async def generate_exercise(request: GenerateExerciseRequest):
     """Generate a single exercise"""
@@ -398,6 +500,11 @@ async def generate_exercise(request: GenerateExerciseRequest):
             exercise_id = str(uuid.uuid4())
             exercise_type = request.exercise_type
             difficulty = request.difficulty
+            image_base64 = None
+            
+            # Check if this is an image-based exercise
+            exercise_info = EXERCISE_TYPES.get(exercise_type, {})
+            has_image = exercise_info.get("has_image", False)
             
             # Generate content based on type
             if exercise_type == "sequence":
@@ -435,6 +542,46 @@ async def generate_exercise(request: GenerateExerciseRequest):
                 title = "Memoria"
                 instruction = "Trova le coppie di simboli uguali."
             
+            elif exercise_type == "maze":
+                content = {"type": "maze"}
+                title = "Labirinto"
+                instruction = "Trova la strada dall'INIZIO alla FINE. Traccia il percorso con la matita."
+                if has_image:
+                    image_base64, error = await generate_image_exercise(exercise_type, difficulty, request.color_mode)
+                    if error:
+                        logging.warning(f"Image generation failed: {error}")
+            
+            elif exercise_type == "coloring":
+                subjects = ["fiore", "gatto", "casa", "albero", "farfalla", "pesce", "sole", "cuore"]
+                subject = random.choice(subjects)
+                content = {"subject": subject}
+                title = "Colora il Disegno"
+                instruction = f"Colora il disegno con i colori che preferisci."
+                if has_image:
+                    image_base64, error = await generate_image_exercise(exercise_type, difficulty, request.color_mode)
+                    if error:
+                        logging.warning(f"Image generation failed: {error}")
+            
+            elif exercise_type == "differences":
+                diff_count = 3 if difficulty == "easy" else (5 if difficulty == "medium" else 7)
+                content = {"differences_count": diff_count}
+                title = "Trova le Differenze"
+                instruction = f"Trova {diff_count} differenze tra le due immagini. Cerchiale."
+                if has_image:
+                    image_base64, error = await generate_image_exercise(exercise_type, difficulty, request.color_mode)
+                    if error:
+                        logging.warning(f"Image generation failed: {error}")
+            
+            elif exercise_type == "connect_dots":
+                dots = 10 if difficulty == "easy" else (15 if difficulty == "medium" else 20)
+                content = {"dots_count": dots}
+                title = "Unisci i Puntini"
+                instruction = f"Collega i puntini in ordine da 1 a {dots} per scoprire il disegno."
+                if has_image:
+                    image_base64, error = await generate_image_exercise(exercise_type, difficulty, request.color_mode)
+                    if error:
+                        logging.warning(f"Image generation failed: {error}")
+            
             else:
                 content = {}
                 title = EXERCISE_TYPES.get(exercise_type, {}).get("name", "Esercizio")
@@ -446,7 +593,8 @@ async def generate_exercise(request: GenerateExerciseRequest):
                 title=title,
                 instruction=instruction,
                 difficulty=difficulty,
-                content=content
+                content=content,
+                image_base64=image_base64
             )
             exercises.append(exercise.model_dump())
         
