@@ -1,34 +1,72 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* BookCreator AI Styles */
+
+/* Remove default text-align center */
+.App {
+    text-align: left;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
+/* Book card animations */
+.book-card {
+    opacity: 0;
+}
+
+/* Ensure smooth transitions */
+.transition-shadow {
+    transition-property: box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+}
+
+.transition-transform {
+    transition-property: transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+}
+
+.transition-opacity {
+    transition-property: opacity;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+}
+
+/* Custom prose styles for book content */
+.prose {
+    --tw-prose-body: hsl(220 10% 10%);
+    --tw-prose-headings: hsl(215 25% 27%);
+}
+
+.prose p {
+    margin-bottom: 1em;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+    font-family: 'Fraunces', serif;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+/* Editor focus styles */
+.editor-textarea::placeholder {
+    color: hsl(215 10% 45% / 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .paper-sheet {
+        padding: 1.5rem !important;
     }
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
-}
-
-.App-link {
-    color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
+/* Print optimizations */
+@media print {
+    .no-print {
+        display: none !important;
     }
-    to {
-        transform: rotate(360deg);
+    
+    .paper-sheet {
+        box-shadow: none !important;
+        border: none !important;
     }
 }
