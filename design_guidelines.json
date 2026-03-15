@@ -1,0 +1,150 @@
+{
+  "project_name": "BookCreator AI",
+  "design_philosophy": {
+    "theme": "The Modern Publisher",
+    "description": "A sophisticated blend of Swiss minimalist precision and the tactile warmth of classical publishing. The UI should feel like a high-end workspace for authors—clean, distraction-free, and typographically rich.",
+    "core_principles": [
+      "Content First: The writing interface is sacred. Minimize UI chrome when typing.",
+      "Tactile Realism: Use subtle paper textures or warm off-whites instead of sterile clinical white.",
+      "Typography as UI: Use font weights and sizes to denote hierarchy instead of colored badges.",
+      "Sharp & Soft: Mix sharp rectangular containers (representing pages) with soft shadow lifts."
+    ]
+  },
+  "typography": {
+    "font_families": {
+      "headings": "Fraunces, serif",
+      "body": "Manrope, sans-serif",
+      "book_text": "Crimson Pro, serif",
+      "monospace": "JetBrains Mono, monospace"
+    },
+    "loading_instructions": "Import fonts from Google Fonts: Fraunces (weights: 300..700), Manrope (weights: 400..700), Crimson Pro (weights: 400..700). Add to index.css or layout.",
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-light tracking-tight text-primary",
+      "h2": "text-3xl font-normal tracking-tight text-primary",
+      "h3": "text-2xl font-medium text-primary/90",
+      "body_lg": "text-lg leading-relaxed text-foreground/90",
+      "body_base": "text-base leading-relaxed text-foreground/80",
+      "caption": "text-sm text-muted-foreground uppercase tracking-widest"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "hsl(35, 30%, 98%)",
+      "foreground": "hsl(220, 10%, 10%)",
+      "primary": "hsl(215, 25%, 27%)",
+      "primary_foreground": "hsl(0, 0%, 100%)",
+      "secondary": "hsl(35, 20%, 94%)",
+      "secondary_foreground": "hsl(220, 10%, 10%)",
+      "muted": "hsl(35, 15%, 90%)",
+      "muted_foreground": "hsl(215, 10%, 45%)",
+      "accent": "hsl(25, 70%, 50%)",
+      "accent_foreground": "hsl(0, 0%, 100%)",
+      "border": "hsl(35, 10%, 85%)",
+      "input": "hsl(35, 10%, 85%)",
+      "ring": "hsl(215, 25%, 27%)"
+    },
+    "usage_rules": [
+      "Use 'background' (#fcfbf9) for the main app canvas to simulate paper.",
+      "Use 'card' (white) for content containers to lift them off the canvas.",
+      "Use 'accent' (Terracotta) sparingly for primary actions (e.g., 'Generate Book', 'Save').",
+      "Use 'primary' (Deep Navy) for text and structural borders.",
+      "Avoid pure black (#000000). Use the dark charcoal 'foreground'."
+    ]
+  },
+  "layout_strategies": {
+    "dashboard": {
+      "grid": "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+      "card_style": "aspect-[2/3] bg-white border border-border/60 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden rounded-sm"
+    },
+    "editor": {
+      "structure": "flex h-screen overflow-hidden bg-background",
+      "sidebar_left": "w-64 border-r border-border bg-white/50 backdrop-blur-sm hidden md:flex flex-col z-10",
+      "sidebar_right": "w-72 border-l border-border bg-white/50 backdrop-blur-sm hidden lg:flex flex-col z-10",
+      "main_area": "flex-1 overflow-y-auto p-8 md:p-12 relative flex justify-center",
+      "paper_sheet": "w-full max-w-3xl min-h-[1100px] bg-white shadow-sm border border-border/40 p-12 mx-auto my-4 transition-all"
+    }
+  },
+  "components": {
+    "buttons": {
+      "default": "rounded-sm font-medium transition-all active:scale-95",
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+      "ghost": "hover:bg-accent/10 hover:text-accent"
+    },
+    "inputs": {
+      "style": "bg-white border-input focus:border-ring focus:ring-1 focus:ring-ring/20 rounded-sm shadow-sm transition-colors"
+    },
+    "cards": {
+      "base": "bg-card text-card-foreground rounded-sm border shadow-sm"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": {
+      "soft": "0 2px 8px -2px rgba(0,0,0,0.05), 0 8px 16px -4px rgba(0,0,0,0.1)",
+      "float": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+    },
+    "textures": "Use a very subtle SVG noise overlay on the body background at 2% opacity to give a paper feel.",
+    "borders": "1px solid border-border. Use 'divide-y' and 'divide-x' utilities for lists."
+  },
+  "assets": {
+    "image_urls": {
+      "placeholders": [
+        {
+          "url": "https://images.unsplash.com/photo-1621944190310-e3cca1564bd7",
+          "category": "cover_placeholder",
+          "description": "Minimal white box on table"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1575823857138-d80155581d8c",
+          "category": "cover_placeholder",
+          "description": "Black and white abstract painting"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1705417272217-490f4511abeb",
+          "category": "workspace",
+          "description": "Laptop on wooden desk"
+        }
+      ],
+      "icons": "Use 'lucide-react' for all UI icons. Use thin strokes (stroke-width={1.5}) to match the elegant theme."
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure all text meets WCAG AA. The 'muted-foreground' must be dark enough on the off-white background.",
+    "focus_states": "Visible focus ring required on all interactive elements. Use 'ring-offset-2' for clear separation."
+  },
+  "motion": {
+    "page_transition": "initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeOut' }}",
+    "hover_effects": "Subtle lift (translate-y-[-2px]) and shadow increase for clickable cards."
+  },
+  "instructions_to_main_agent": [
+    "INSTALLATION: Add '@fontsource/fraunces', '@fontsource/manrope', '@fontsource/crimson-pro' if using npm/yarn, or add Google Fonts links to index.html.",
+    "LANGUAGE: The UI MUST be in Italian ('Nuovo Libro', 'Capitoli', 'Impostazioni', etc.).",
+    "THEME SETUP: Update 'tailwind.config.js' and 'index.css' with the HSL values provided in the 'colors' section.",
+    "SHADCN CUSTOMIZATION: Override default 'radius' to '0.3rem' in tailwind config.",
+    "EDITOR LOGIC: Implement the 'Book Editor' as the core feature. It needs a sidebar for chapters and a main content editable area.",
+    "PDF GENERATION: Use 'html2pdf.js' or 'jspdf' for client-side generation, ensuring the output respects the KDP trim sizes (6x9, etc.).",
+    "STATE MANAGEMENT: Use Context API or Zustand to manage the 'Book Project' state (chapters, metadata, styles) globally.",
+    "NO AUTH: Implement a simple 'Local Project Manager' that saves work to localStorage/IndexedDB. No login screen needed.",
+    "AI INTEGRATION: Create a service layer for OpenAI calls. Mock the response if API key is missing."
+  ],
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: 'transition: all'. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add '.App { text-align: center; }' in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Create new components that match the style and conventions of existing components when needed",
+    "Examine existing components to understand the project's component patterns before creating new ones",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use 'sonner' for toasts. Sonner component are located in '/app/src/components/ui/sonner.tsx'"
+  ]
+}
