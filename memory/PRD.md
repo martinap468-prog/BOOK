@@ -1,90 +1,77 @@
-# BookCreator AI - PRD
+# Quaderni Cognitivi - PRD
 
 ## Problem Statement
-Software per generare libretti PDF da pubblicare su Amazon KDP. Generazione automatica di contenuti usando AI (OpenAI GPT-5.2), immagini (GPT Image 1), con possibilità di modifiche manuali a testo, immagini, dimensioni e font.
+Software per generare quaderni di esercizi cognitivi per persone con Alzheimer. Esercizi con grafica semplice, font grandi, struttura a capitoli. Possibilità di scegliere tipo di esercizio, difficoltà, numero di esercizi, modalità colore.
 
 ## User Personas
-- **Self-publishers**: Autori indipendenti che vogliono pubblicare su Amazon KDP
-- **Content Creators**: Creatori di contenuti che vogliono trasformare idee in libri
-- **Small Publishers**: Piccole case editrici che cercano strumenti di produzione rapida
+- **Caregiver/Familiari**: Chi assiste persone con Alzheimer e cerca materiali di stimolazione
+- **Terapisti occupazionali**: Professionisti che lavorano con pazienti con demenza
+- **Case di riposo/RSA**: Strutture che necessitano materiali per attività cognitive
 
 ## Core Requirements (Static)
-1. Generazione contenuti AI (GPT-5.2)
-2. Generazione immagini/copertine AI (GPT Image 1)
-3. Supporto formati Amazon KDP (5"x8", 6"x9", 8.5"x11")
-4. Modifica manuale testo e immagini
-5. Personalizzazione font e dimensioni
-6. Export PDF professionale
+1. Tipi di esercizi multipli (sequenze, calcoli, trova intruso, collega, copia, riconoscimento, memoria)
+2. 3 livelli di difficoltà (facile, medio, difficile)
+3. Font grandi e leggibili (16-24pt)
+4. Modalità B/N e colori
+5. 1 esercizio per pagina
+6. Export PDF per stampa
 7. Interfaccia in italiano
 
 ## Architecture
-- **Frontend**: React + Tailwind CSS + Shadcn UI
+- **Frontend**: React + Tailwind CSS + Shadcn UI + Zustand
 - **Backend**: FastAPI + MongoDB
-- **AI**: OpenAI GPT-5.2 (testo) + GPT Image 1 (immagini) via Emergent LLM Key
-- **State Management**: Zustand con persistenza localStorage
-- **PDF Generation**: jsPDF + html2canvas
+- **PDF Generation**: jsPDF
 
 ## What's Been Implemented (Jan 2026)
 
-### Dashboard (/)
-- ✅ Lista progetti/libri con card animate
-- ✅ Dialog creazione nuovo libro
-- ✅ Generazione struttura AI (outline)
-- ✅ Eliminazione libri con conferma
+### Dashboard
+- ✅ Lista quaderni con card
+- ✅ Creazione nuovo quaderno con impostazioni
+- ✅ Eliminazione quaderni
 
-### Book Editor (/editor/:bookId)
-- ✅ Editor testo con anteprima live
-- ✅ Gestione capitoli (add/edit/delete)
-- ✅ Generazione contenuto AI per capitoli
-- ✅ Generazione immagini AI per capitoli
-- ✅ Personalizzazione font/dimensioni/interlinea
-- ✅ Selezione formato libro
-- ✅ Auto-save con debounce
+### Book Editor
+- ✅ Sidebar con lista capitoli ed esercizi
+- ✅ Generazione capitoli con esercizi AI
+- ✅ Visualizzazione esercizi in formato grande
+- ✅ Navigazione tra esercizi
+- ✅ Salvataggio automatico
 
-### Cover Designer (/cover/:bookId)
-- ✅ Generazione copertina AI con stili (modern/classic/artistic/photo)
-- ✅ Upload immagine personalizzata
-- ✅ Overlay testo con colori/dimensioni personalizzabili
+### Tipi di Esercizi
+- ✅ **Completa la Sequenza** - Numeri mancanti
+- ✅ **Calcoli** - Operazioni matematiche semplici
+- ✅ **Trova l'Intruso** - Elemento non appartenente al gruppo
+- ✅ **Collega** - Abbina parole a definizioni
+- ✅ **Copia e Scrivi** - Ricalco parole/frasi
+- ✅ **Riconoscimento** - Identifica oggetti
+- ✅ **Memoria** - Trova le coppie
 
-### PDF Preview (/preview/:bookId)
-- ✅ Anteprima pagine navigabile
-- ✅ Export PDF con formato corretto per Amazon KDP
-- ✅ Supporto copertina, pagina titolo, capitoli, immagini
-
-### Backend API
-- ✅ CRUD libri (/api/books)
-- ✅ CRUD capitoli (/api/books/:id/chapters)
-- ✅ Generazione outline AI (/api/generate/outline)
-- ✅ Generazione contenuto AI (/api/generate/content)
-- ✅ Generazione immagini AI (/api/generate/image)
-- ✅ Generazione copertina AI (/api/generate/cover)
+### PDF Preview & Export
+- ✅ Anteprima navigabile
+- ✅ Export PDF formato Amazon KDP
 
 ## Prioritized Backlog
 
 ### P0 (Critical) - DONE
-- ✅ Core book creation flow
-- ✅ AI text generation
-- ✅ AI image generation
-- ✅ PDF export
+- ✅ Generazione esercizi automatica
+- ✅ Struttura capitoli
+- ✅ Export PDF
 
 ### P1 (High Priority)
-- [ ] Drag & drop reorder chapters
-- [ ] Bulk AI generation (tutti i capitoli in una volta)
-- [ ] Template predefiniti per generi diversi
+- [ ] Generazione immagini AI per esercizi grafici (labirinti, colorare, trova differenze)
+- [ ] Pagina soluzioni alla fine del quaderno
+- [ ] Template predefiniti per livelli diversi
 
 ### P2 (Medium Priority)
-- [ ] Collaborazione multi-utente
-- [ ] Versioning/history dei libri
-- [ ] Integrazione diretta con Amazon KDP API
-- [ ] Support per più lingue oltre l'italiano
+- [ ] Esportazione in formati multipli (A4, Letter)
+- [ ] Condivisione quaderni tra utenti
+- [ ] Statistiche di utilizzo
 
 ### P3 (Nice to Have)
-- [ ] AI suggestions durante la scrittura
-- [ ] SEO keywords per Amazon
-- [ ] Preview 3D del libro fisico
-- [ ] Export in formati aggiuntivi (EPUB, MOBI)
+- [ ] App mobile per caregiver
+- [ ] Versione interattiva digitale
+- [ ] Integrazione con cliniche/RSA
 
 ## Next Tasks
-1. Implementare drag & drop per riordinare capitoli
-2. Aggiungere generazione bulk di tutti i contenuti dei capitoli
-3. Creare template predefiniti per diversi generi di libri
+1. Aggiungere generazione immagini AI per labirinti e "trova le differenze"
+2. Creare pagina soluzioni automatica
+3. Implementare più variazioni negli esercizi esistenti
