@@ -425,7 +425,8 @@ export default function Dashboard() {
             >
               {isGenerating ? (
                 <>
-                  <span className="loading-pulse">Generazione...</span>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generazione AI (può richiedere 30-60s)...</span>
                 </>
               ) : (
                 <>
